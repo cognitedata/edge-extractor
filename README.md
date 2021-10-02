@@ -17,10 +17,6 @@ Integration process
 ![Edge extractor high level diagram 2](/docs/edge-extractor-integr-process.png)
 
 
-### Development 
-
-TBD
-
 ### Connectors 
 
 #### Input connector 
@@ -45,5 +41,12 @@ Supported camera drives :
 - Reolink 
 - File system. 
 
+### Configurations
 
+The service is using 2 types of configurations : 
+1. Static - loaded durign service startup . 
+2. Dynamic - loaded from remote endpoint , for instance from Asset metadata. 
 
+### Development 
+
+TBD

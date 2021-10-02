@@ -2,9 +2,8 @@ name: Go
 
 on:
   push:
-    branches: [ develop ]
-  pull_request:
     branches: [ main ]
+  release:
 
 jobs:
 
@@ -23,7 +22,6 @@ jobs:
       
     - name: Release
       uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/')
       with:
         files: |
           edge-extractor-win-amd64.exe
