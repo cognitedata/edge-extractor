@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core"
+	"github.com/cognitedata/edge-extractor/connectors/inputs"
 	"github.com/cognitedata/edge-extractor/internal"
-	"github.com/cognitedata/edge-extractor/plugins/inputs"
 	log "github.com/sirupsen/logrus"
 )
 
