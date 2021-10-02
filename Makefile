@@ -12,7 +12,7 @@ build-linux-386:
 	GOOS=linux GOARCH=386 go build -o edge-extractor-linux-386 cmd/main.go
 
 build-linux-amd64:
-	GOOS=linux GOARCH=amd64 go build -o edge-extractor-linux-386 cmd/main.go
+	GOOS=linux GOARCH=amd64 go build -o edge-extractor-linux-amd64 cmd/main.go
 
 build-osx-intel:
 	GOOS=darwin GOARCH=amd64 go build -o edge-extractor-osx-amd64 cmd/main.go
@@ -22,5 +22,6 @@ build-osx-arm:
 
 
 build-multios: build-windows build-linux-386 build-linux-amd64 build-osx-intel build-osx-arm
+	
 
 

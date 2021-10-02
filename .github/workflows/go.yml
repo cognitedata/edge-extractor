@@ -19,7 +19,7 @@ jobs:
         go-version: 1.17
 
     - name: build artifacts
-      run: make multios
+      run: make build-multios
       
     - name: Release
       uses: softprops/action-gh-release@v1
@@ -28,7 +28,7 @@ jobs:
         files: |
           edge-extractor-win-amd64.exe
           edge-extractor-linux-386
+          edge-extractor-linux-amd64
           edge-extractor-osx-amd64
           edge-extractor-osx-arm
-          edge-extractor-osx-amd64
           
