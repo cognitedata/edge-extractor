@@ -1,12 +1,12 @@
 # Edge extractor 
 
-Edge extractor is remote data extraction agent. The service should be installed in on premise (normally DMZ network) and connect to an equipment over local network or via serial protocols. 
+The edge extractor is a remote data extraction agent. The service should be installed on-premise (typically DMZ network) and talk to devices over the local network or via serial protocols.
 
-The service is disctributed as self contained platform specific binary. 
+The service is distributed as a self-contained platform-specific binary.  
 
 ### Architecture 
 
-Each extraction pipeline is build around concept of integration process with `input connectors` for data extraction from source system and `output connects` for data ingestion into sync. 
+Each extraction pipeline is built around the concept of the integration process, with `input connectors` for data extraction from an input device and `output connects` for data ingestion into the output system.
 
 High level overview :
 
@@ -27,10 +27,12 @@ Integration process
 
 - CDF output 
 
-### Inetration processes 
+### Integration processes 
 
-- Camera to CDF . The process loads configuraions from CDF asset -> requests images from each IP camera -> uploads images to CDF Files and link them to camera asset
-- Local storage file to CDF . The process load images from SD cars or another local storage -> uploads images to CDF Files and link them to camera asset.
+- Camera to CDF . The process loads configurations from CDF asset -> requests images from each IP camera -> uploads images to CDF Files and link them to camera asset
+- Local storage file to CDF. The process loads images from SD a card or different local storage, uploads images to CDF Files, and links them to camera assets.
+
+All processes support parallel data retrieval from multiple devices. 
 
 ### Device drivers 
 
