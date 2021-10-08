@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"io/ioutil"
@@ -15,11 +16,27 @@ func main() {
 	log.Info("----- Starting edge-extractor -----------")
 
 	mainConfigPath := flag.String("config", "config.json", "Full path to main configuration file")
+
+	base64encodedConfig := flag.String("bconfig", "", "Base64 encoded config")
 	op := flag.String("op", "", "Supported operations : 'gen_config' ")
 
 	flag.Parse()
 
 	var config internal.StaticConfig
+	var configBody []byte
+	var err error
+
+	if *base64encodedConfig != "" {
+		log.Info("Loading configuration from cmd line parameter")
+		// Base64 Standard Decoding
+		body, err := base64.StdEncoding.DecodeString(*base64encodedConfig)
+		if err != nil {
+			log.Error("Error decoding base64 encoded config: %s ", err.Error())
+			return
+		}
+		ioutil.WriteFile("config.json", body, 0644)
+
+	}
 
 	if *op == "gen_config" {
 		log.Info("Generating config file")
@@ -34,12 +51,14 @@ func main() {
 
 	log.SetLevel(log.DebugLevel)
 
-	configBody, err := ioutil.ReadFile(*mainConfigPath)
+	if configBody == nil {
+		configBody, err = ioutil.ReadFile(*mainConfigPath)
 
-	if err != nil {
-		log.Error("Application is not configured. Either add configuraion file or use configuraion UI to configure the application")
-		// TODO : Start config ui webserver here
-		return
+		if err != nil {
+			log.Error("Application is not configured. Either add configuraion file or use configuraion UI to configure the application")
+			// TODO : Start config ui webserver here
+			return
+		}
 	}
 
 	err = json.Unmarshal(configBody, &config)

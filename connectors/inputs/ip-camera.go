@@ -17,9 +17,10 @@ type IpCamera struct {
 
 func NewIpCamera(model, address, cType, username, password string) *IpCamera {
 	driverCon := map[string]camera.DriverConstructor{
-		"fscam":   camera.NewFileSystemCameraDriver,
-		"axis":    camera.NewAxisCameraDriver,
-		"reolink": camera.NewReolinkCameraDriver,
+		"fscam":      camera.NewFileSystemCameraDriver,
+		"axis":       camera.NewAxisCameraDriver,
+		"hickvision": camera.NewHickvisionCameraDriver,
+		"reolink":    camera.NewReolinkCameraDriver,
 	}
 
 	driver := driverCon[model]

@@ -27,7 +27,7 @@ func NewCameraImagesToCdf(cogClient *internal.CdfClient) *CameraImagesToCdf {
 func (intgr *CameraImagesToCdf) Start() error {
 	intgr.isStarted = true
 
-	filter := core.AssetFilter{Metadata: map[string]string{"cog_class": "camera"}}
+	filter := core.AssetFilter{Metadata: map[string]string{"cog_class": "camera", "state": "enabled"}}
 
 	assets, err := intgr.cogClient.Client().Assets.Filter(filter, 1000)
 
@@ -37,7 +37,7 @@ func (intgr *CameraImagesToCdf) Start() error {
 
 	// Creating processor for each camera asset.
 	for ai := range assets {
-		go intgr.startProcessor(10, &assets[ai])
+		go intgr.startProcessor(20, &assets[ai])
 	}
 	return nil
 }
@@ -70,13 +70,13 @@ func (intgr *CameraImagesToCdf) startProcessor(delay int64, asset *core.Asset) e
 	for {
 		img, err := cam.ExtractImage()
 		if err != nil {
-			log.Debugf("Can't extract image. Error : ", err.Error())
-			time.Sleep(time.Second * 10)
+			log.Debug("Can't extract image. Error : ", err.Error())
+			time.Sleep(time.Second * 30)
 		} else {
 			err := intgr.cogClient.UploadInMemoryFile(img.Body, "", asset.Name, img.Format, asset.ID)
 			if err != nil {
 				log.Debug("Can't upload image. Error : ", err.Error())
-				time.Sleep(time.Second * 10)
+				time.Sleep(time.Second * 30)
 			} else {
 				log.Debug("File uploaded to CDF successfully")
 			}

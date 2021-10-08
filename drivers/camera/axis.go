@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type AxisCameraDriver struct {
@@ -20,10 +22,17 @@ func NewAxisCameraDriver() Driver {
 
 func (cam *AxisCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
 
-	resp, err := cam.httpClient.Get(address)
+	req, err := http.NewRequest("GET", address, nil)
 	if err != nil {
 		return nil, err
 	}
+	req.SetBasicAuth(username, password)
+
+	resp, err := cam.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -33,6 +42,13 @@ func (cam *AxisCameraDriver) ExtractImage(address, username, password string) (*
 
 	if err != nil {
 		return nil, err
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+
+	if contentType != "image/jpeg" {
+		log.Errorf("Incompatable content type %s from camera API", contentType)
+		return nil, fmt.Errorf("incompatible content type %s", contentType)
 	}
 
 	img := Image{Body: body, Format: "image/jpeg"}
