@@ -19,7 +19,7 @@ func NewIpCamera(model, address, cType, username, password string) *IpCamera {
 	driverCon := map[string]camera.DriverConstructor{
 		"fscam":      camera.NewFileSystemCameraDriver,
 		"axis":       camera.NewAxisCameraDriver,
-		"hickvision": camera.NewHickvisionCameraDriver,
+		"hickvision": camera.NewHikvisionCameraDriver,
 		"reolink":    camera.NewReolinkCameraDriver,
 	}
 

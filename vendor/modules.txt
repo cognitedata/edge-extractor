@@ -25,6 +25,9 @@ github.com/pkg/errors
 # github.com/sirupsen/logrus v1.6.0
 ## explicit; go 1.13
 github.com/sirupsen/logrus
+# github.com/xinsnake/go-http-digest-auth-client v0.6.0
+## explicit
+github.com/xinsnake/go-http-digest-auth-client
 # golang.org/x/net v0.0.0-20201224014010-6772e930b67b
 ## explicit; go 1.11
 golang.org/x/net/context

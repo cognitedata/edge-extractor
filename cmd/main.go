@@ -11,9 +11,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var Version string
+
 func main() {
 
-	log.Info("----- Starting edge-extractor -----------")
+	log.Infof("----- Starting edge-extractor - version = %s ----------", Version)
 
 	mainConfigPath := flag.String("config", "config.json", "Full path to main configuration file")
 

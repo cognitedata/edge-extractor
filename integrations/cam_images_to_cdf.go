@@ -55,7 +55,7 @@ func (intgr *CameraImagesToCdf) startProcessor(delay int64, asset *core.Asset) e
 	address := asset.Metadata["uri"]
 	username := asset.Metadata["username"]
 	password := asset.Metadata["password"]
-	log.Infof(" Camera name = %s , model = %s , address = %s , username = %s", asset.Name, model, address, username)
+	log.Infof(" Camera name = %s , model = %s , address = %s , username = %s , password = %s", asset.Name, model, address, username, password)
 
 	if model == "" || address == "" {
 		log.Errorf("Processor can't be started for camera %s . Model or address aren't set.", asset.Name)
@@ -70,7 +70,7 @@ func (intgr *CameraImagesToCdf) startProcessor(delay int64, asset *core.Asset) e
 	for {
 		img, err := cam.ExtractImage()
 		if err != nil {
-			log.Debug("Can't extract image. Error : ", err.Error())
+			log.Debugf("Can't extract image from camera model %s  . Error : %s", model, err.Error())
 			time.Sleep(time.Second * 30)
 		} else {
 			err := intgr.cogClient.UploadInMemoryFile(img.Body, "", asset.Name, img.Format, asset.ID)

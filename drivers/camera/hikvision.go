@@ -11,19 +11,20 @@ import (
 	dac "github.com/xinsnake/go-http-digest-auth-client"
 )
 
-type AxisCameraDriver struct {
+type HikvisionCameraDriver struct {
 	httpClient      http.Client
 	digestTransport *dac.DigestTransport
 }
 
-func NewAxisCameraDriver() Driver {
+func NewHikvisionCameraDriver() Driver {
 	httpClient := http.Client{
 		Timeout: 15 * time.Second,
 	}
-	return &AxisCameraDriver{httpClient: httpClient}
+	return &HikvisionCameraDriver{httpClient: httpClient}
 }
 
-func (cam *AxisCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
+func (cam *HikvisionCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
+
 	if cam.digestTransport == nil {
 		t := dac.NewTransport(username, password)
 		cam.digestTransport = &t
@@ -48,7 +49,6 @@ func (cam *AxisCameraDriver) ExtractImage(address, username, password string) (*
 	if err != nil {
 		return nil, err
 	}
-
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -72,6 +72,6 @@ func (cam *AxisCameraDriver) ExtractImage(address, username, password string) (*
 	return &img, nil
 }
 
-func (cam *AxisCameraDriver) Ping(address string) bool {
+func (cam *HikvisionCameraDriver) Ping(address string) bool {
 	return true
 }
