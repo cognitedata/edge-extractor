@@ -9,20 +9,19 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type ReolinkCameraDriver struct {
+type UrlCameraDriver struct {
 	httpClient http.Client
 }
 
-func NewReolinkCameraDriver() Driver {
+func NewUrlCameraDriver() Driver {
 	httpClient := http.Client{
 		Timeout: 15 * time.Second,
 	}
-	return &ReolinkCameraDriver{httpClient: httpClient}
+	return &UrlCameraDriver{httpClient: httpClient}
 }
 
-func (cam *ReolinkCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
+func (cam *UrlCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
 
-	address = fmt.Sprintf("%s&user=%s&password=%s", address, username, password)
 	resp, err := cam.httpClient.Get(address)
 	if err != nil {
 		return nil, err
@@ -50,6 +49,6 @@ func (cam *ReolinkCameraDriver) ExtractImage(address, username, password string)
 	return &img, nil
 }
 
-func (cam *ReolinkCameraDriver) Ping(address string) bool {
+func (cam *UrlCameraDriver) Ping(address string) bool {
 	return true
 }

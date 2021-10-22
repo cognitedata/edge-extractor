@@ -3,6 +3,9 @@ version="0.0.3"
 set_private_repos :
 	go get github.com/cognitedata/cognite-sdk-go
 
+run :
+	go run cmd/main.go
+
 build : 
 	go build -o edge-extractor -ldflags="-X main.Version=${version}" cmd/main.go
 

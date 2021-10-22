@@ -11,18 +11,19 @@ import (
 // Client represents a Client that is used to interact with
 // Cognite Data Fusion (CDF) api
 type Client struct {
-	Config             *Config
-	apiClient          *api.Client
-	Assets             *core.Assets
-	Events             *core.Events
-	Files              *core.Files
-	TimeSeries         *core.TimeSeries
-	APIKeys            *iam.APIKeys
-	ServiceAccounts    *iam.ServiceAccounts
-	SecurityCategories *iam.SecurityCategories
-	Groups             *iam.Groups
-	Projects           *iam.Projects
-	Raw                *core.Raw
+	Config              *Config
+	apiClient           *api.Client
+	Assets              *core.Assets
+	Events              *core.Events
+	Files               *core.Files
+	TimeSeries          *core.TimeSeries
+	ExtractionPipelines *core.ExtractionPipelines
+	APIKeys             *iam.APIKeys
+	ServiceAccounts     *iam.ServiceAccounts
+	SecurityCategories  *iam.SecurityCategories
+	Groups              *iam.Groups
+	Projects            *iam.Projects
+	Raw                 *core.Raw
 }
 
 func setLogLevel(lvl string) {
@@ -51,18 +52,19 @@ func NewClient(config *Config, options ...func(*api.Client)) *Client {
 	projectAPIClient := api.NewClient(projectAPIBasePath, config.AppName, config.CogniteAuth, options...)
 
 	client := Client{
-		Config:             config,
-		apiClient:          apiClient,
-		Assets:             core.NewAssets(apiClient),
-		Events:             core.NewEvents(apiClient),
-		Files:              core.NewFiles(apiClient),
-		TimeSeries:         core.NewTimeSeries(apiClient),
-		APIKeys:            iam.NewAPIKeys(apiClient),
-		Groups:             iam.NewGroups(apiClient),
-		SecurityCategories: iam.NewSecurityCategories(apiClient),
-		ServiceAccounts:    iam.NewServiceAccounts(apiClient),
-		Projects:           iam.NewProjects(projectAPIClient),
-		Raw:                core.NewRaw(apiClient),
+		Config:              config,
+		apiClient:           apiClient,
+		Assets:              core.NewAssets(apiClient),
+		Events:              core.NewEvents(apiClient),
+		Files:               core.NewFiles(apiClient),
+		TimeSeries:          core.NewTimeSeries(apiClient),
+		ExtractionPipelines: core.NewExtractionPipelines(apiClient),
+		APIKeys:             iam.NewAPIKeys(apiClient),
+		Groups:              iam.NewGroups(apiClient),
+		SecurityCategories:  iam.NewSecurityCategories(apiClient),
+		ServiceAccounts:     iam.NewServiceAccounts(apiClient),
+		Projects:            iam.NewProjects(projectAPIClient),
+		Raw:                 core.NewRaw(apiClient),
 	}
 	return &client
 }

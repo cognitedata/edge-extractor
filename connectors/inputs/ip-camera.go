@@ -21,6 +21,7 @@ func NewIpCamera(model, address, cType, username, password string) *IpCamera {
 		"axis":       camera.NewAxisCameraDriver,
 		"hickvision": camera.NewHikvisionCameraDriver,
 		"reolink":    camera.NewReolinkCameraDriver,
+		"urlcam":     camera.NewUrlCameraDriver,
 	}
 
 	driver := driverCon[model]

@@ -3,7 +3,7 @@ module github.com/cognitedata/edge-extractor
 go 1.17
 
 require (
-	github.com/cognitedata/cognite-sdk-go v0.3.1
+	github.com/cognitedata/cognite-sdk-go v0.3.2-0.20211022150037-c6aa1283f946
 	github.com/sirupsen/logrus v1.6.0
 )
 

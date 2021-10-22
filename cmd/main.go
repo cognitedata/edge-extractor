@@ -77,7 +77,7 @@ func main() {
 	for _, integrName := range config.EnabledIntegrations {
 		switch integrName {
 		case "ip_cams_to_cdf":
-			intgr := integrations.NewCameraImagesToCdf(cdfCLient)
+			intgr := integrations.NewCameraImagesToCdf(cdfCLient, config.ExtractionMonitoringID)
 			err = intgr.Start()
 			if err != nil {
 				log.Errorf(" %s integration can't be started . Error : %s", integrName, err.Error())

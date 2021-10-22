@@ -207,3 +207,30 @@ func (co *CdfClient) UploadInMemoryBody(body []byte, fileName, mimeType, uploadU
 	return nil
 
 }
+
+// CompareAssets compares 2 assets and returs true if they are equal
+func (co *CdfClient) CompareAssets(asset1, asset2 core.Asset) bool {
+
+	if asset1.ID != asset2.ID {
+		return false
+	}
+	if asset1.ExternalID != asset2.ExternalID {
+		return false
+	}
+
+	if asset1.Name != asset2.Name {
+		return false
+	}
+
+	if len(asset1.Metadata) != len(asset2.Metadata) {
+		return false
+	}
+
+	for i := range asset1.Metadata {
+		if asset1.Metadata[i] != asset2.Metadata[i] {
+			return false
+		}
+	}
+	return true
+
+}

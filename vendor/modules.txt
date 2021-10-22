@@ -1,4 +1,4 @@
-# github.com/cognitedata/cognite-sdk-go v0.3.1
+# github.com/cognitedata/cognite-sdk-go v0.3.2-0.20211022150037-c6aa1283f946
 ## explicit; go 1.13
 github.com/cognitedata/cognite-sdk-go/pkg/cognite
 github.com/cognitedata/cognite-sdk-go/pkg/cognite/api
