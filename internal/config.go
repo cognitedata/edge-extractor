@@ -12,4 +12,5 @@ type StaticConfig struct {
 	ExtractionMonitoringID string
 
 	EnabledIntegrations []string
+	LogLevel            string
 }

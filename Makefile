@@ -1,4 +1,4 @@
-version="0.0.3"
+version="0.0.4"
 
 set_private_repos :
 	go get github.com/cognitedata/cognite-sdk-go
@@ -11,6 +11,10 @@ build :
 
 build-windows:
 	GOOS=windows GOARCH=amd64 go build -ldflags="-X main.Version=${version}" -o edge-extractor-win-amd64.exe cmd/main.go
+
+build-windows-arm64:
+	GOOS=windows GOARCH=arm64 go build -ldflags="-X main.Version=${version}" -o edge-extractor-win-arm64.exe cmd/main.go
+
 
 build-linux-386:
 	GOOS=linux GOARCH=386 go build -ldflags="-X main.Version=${version}" -o edge-extractor-linux-386 cmd/main.go

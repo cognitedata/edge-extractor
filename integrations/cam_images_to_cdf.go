@@ -33,27 +33,22 @@ func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractoMonitoringID st
 func (intgr *CameraImagesToCdf) Start() error {
 	intgr.isStarted = true
 
-	// filter := core.AssetFilter{Metadata: map[string]string{"cog_class": "camera", "state": "enabled"}}
-
-	// assets, err := intgr.cogClient.Client().Assets.Filter(filter, 10000)
-
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // Creating processor for each camera asset.
-	// for ai := range assets {
-	// 	go intgr.startProcessor(20, assets[ai])
-	// }
 	go intgr.startCdfConfigPolling()
 	go intgr.startSelfMonitoring()
 	return nil
+}
+
+func (intgr *CameraImagesToCdf) Stop() {
+	intgr.isStarted = false
 }
 
 func (intgr *CameraImagesToCdf) startCdfConfigPolling() {
 	for {
 		intgr.ReloadRemoteConfigs()
 		time.Sleep(time.Second * 30)
+		if !intgr.isStarted {
+			break
+		}
 	}
 }
 

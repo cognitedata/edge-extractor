@@ -11,6 +11,7 @@ import (
 	"github.com/cognitedata/cognite-sdk-go/pkg/cognite"
 	"github.com/cognitedata/cognite-sdk-go/pkg/cognite/api"
 	"github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core"
+	log "github.com/sirupsen/logrus"
 )
 
 type CdfClient struct {
@@ -26,7 +27,7 @@ func NewCdfClient(projectName, cdfCluster, clientID, clientSecret string, scopes
 	auth := api.NewOidcClientCredsAuthWithParams(tokenUrl, clientID, clientSecret, scopes, nil)
 
 	config := cognite.Config{
-		LogLevel:    "debug",
+		LogLevel:    log.GetLevel().String(),
 		Project:     projectName,
 		BaseUrl:     "https://" + cdfCluster + ".cognitedata.com",
 		AppName:     "edge-extractor",
