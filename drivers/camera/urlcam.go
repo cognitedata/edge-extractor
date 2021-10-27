@@ -49,6 +49,10 @@ func (cam *UrlCameraDriver) ExtractImage(address, username, password string) (*I
 	return &img, nil
 }
 
+func (cam *UrlCameraDriver) ExtractMetadata(address, username, password string) ([]byte, error) {
+	return nil, nil
+}
+
 func (cam *UrlCameraDriver) Ping(address string) bool {
 	return true
 }

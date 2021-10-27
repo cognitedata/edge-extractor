@@ -45,7 +45,7 @@ func (intgr *CameraImagesToCdf) Stop() {
 func (intgr *CameraImagesToCdf) startCdfConfigPolling() {
 	for {
 		intgr.ReloadRemoteConfigs()
-		time.Sleep(time.Second * 30)
+		time.Sleep(time.Second * 60)
 		if !intgr.isStarted {
 			break
 		}
@@ -180,6 +180,8 @@ func (intgr *CameraImagesToCdf) startProcessor(asset core.Asset) error {
 	address := asset.Metadata["uri"]
 	username := asset.Metadata["username"]
 	password := asset.Metadata["password"]
+	mode := asset.Metadata["mode"]
+
 	log.Infof(" Camera name = %s , model = %s , address = %s , username = %s , password = %s", asset.Name, model, address, username, password)
 
 	if model == "" || address == "" {
@@ -228,6 +230,16 @@ func (intgr *CameraImagesToCdf) startProcessor(asset core.Asset) error {
 				break
 			}
 		}
+
+		if mode == "camera+metadata" {
+			bmeta, err := cam.ExtractMetadata()
+			if err != nil {
+				log.Info("Metadata from camera:")
+				log.Info(string(bmeta))
+				intgr.reportRunStatus("", core.ExtractionRunStatusSuccess, string(bmeta))
+			}
+		}
+
 	}
 	log.Infof("Processor %d exited main loop ", asset.ID)
 	return nil

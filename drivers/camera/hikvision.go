@@ -24,6 +24,9 @@ func NewHikvisionCameraDriver() Driver {
 }
 
 func (cam *HikvisionCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
+	// http://10.22.15.61/ISAPI/Streaming/channels/1/picture
+
+	address = address + "/ISAPI/Streaming/channels/1/picture"
 
 	if cam.digestTransport == nil {
 		t := dac.NewTransport(username, password)
@@ -70,6 +73,10 @@ func (cam *HikvisionCameraDriver) ExtractImage(address, username, password strin
 	img := Image{Body: body, Format: "image/jpeg"}
 
 	return &img, nil
+}
+
+func (cam *HikvisionCameraDriver) ExtractMetadata(address, username, password string) ([]byte, error) {
+	return nil, nil
 }
 
 func (cam *HikvisionCameraDriver) Ping(address string) bool {

@@ -22,6 +22,7 @@ func NewIpCamera(model, address, cType, username, password string) *IpCamera {
 		"hickvision": camera.NewHikvisionCameraDriver,
 		"reolink":    camera.NewReolinkCameraDriver,
 		"urlcam":     camera.NewUrlCameraDriver,
+		"flir_ax8":   camera.NewFlirAx8CameraDriver,
 	}
 
 	driver := driverCon[model]
@@ -39,4 +40,11 @@ func (cam *IpCamera) ExtractImage() (*camera.Image, error) {
 		return nil, fmt.Errorf("unknown driver")
 	}
 	return cam.driver.ExtractImage(cam.address, cam.username, cam.password)
+}
+
+func (cam *IpCamera) ExtractMetadata() ([]byte, error) {
+	if cam.driver == nil {
+		return nil, fmt.Errorf("unknown driver")
+	}
+	return cam.driver.ExtractMetadata(cam.address, cam.username, cam.password)
 }

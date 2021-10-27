@@ -24,6 +24,8 @@ func NewAxisCameraDriver() Driver {
 }
 
 func (cam *AxisCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
+	//"http://10.22.15.62/axis-cgi/jpg/image.cgi"
+	address = address + "/axis-cgi/jpg/image.cgi"
 	if cam.digestTransport == nil {
 		t := dac.NewTransport(username, password)
 		cam.digestTransport = &t
@@ -70,6 +72,10 @@ func (cam *AxisCameraDriver) ExtractImage(address, username, password string) (*
 	img := Image{Body: body, Format: "image/jpeg"}
 
 	return &img, nil
+}
+
+func (cam *AxisCameraDriver) ExtractMetadata(address, username, password string) ([]byte, error) {
+	return nil, nil
 }
 
 func (cam *AxisCameraDriver) Ping(address string) bool {

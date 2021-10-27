@@ -25,6 +25,10 @@ func (cam *FileSystemCameraDriver) ExtractImage(address, username, password stri
 	return &img, nil
 }
 
+func (cam *FileSystemCameraDriver) ExtractMetadata(address, username, password string) ([]byte, error) {
+	return nil, nil
+}
+
 func (cam *FileSystemCameraDriver) Ping(address string) bool {
 	return true
 }

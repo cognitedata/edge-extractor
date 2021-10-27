@@ -50,6 +50,10 @@ func (cam *ReolinkCameraDriver) ExtractImage(address, username, password string)
 	return &img, nil
 }
 
+func (cam *ReolinkCameraDriver) ExtractMetadata(address, username, password string) ([]byte, error) {
+	return nil, nil
+}
+
 func (cam *ReolinkCameraDriver) Ping(address string) bool {
 	return true
 }
