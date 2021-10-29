@@ -1,4 +1,4 @@
-version="0.1.0"
+version="0.1.2"
 
 set_private_repos :
 	go get github.com/cognitedata/cognite-sdk-go
@@ -29,7 +29,7 @@ build-osx-arm:
 	GOOS=darwin GOARCH=arm64 go build -ldflags="-X main.Version=${version}" -o edge-extractor-osx-arm cmd/main.go
 
 
-build-multios: build-windows build-linux-386 build-linux-amd64 build-osx-intel build-osx-arm
+build-multios: build-windows build-windows-arm64 build-linux-386 build-linux-amd64 build-osx-intel build-osx-arm
 
 
 

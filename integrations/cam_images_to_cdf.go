@@ -21,11 +21,11 @@ type CameraImagesToCdf struct {
 	globalCamPollingInterval time.Duration
 	successCounter           uint64
 	failureCounter           uint64
-	extractorMonitoringID    string
+	extractorID              string
 }
 
 func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractoMonitoringID string) *CameraImagesToCdf {
-	return &CameraImagesToCdf{cogClient: cogClient, globalCamPollingInterval: time.Second * 20, stateTracker: internal.NewStateTracker(), extractorMonitoringID: extractoMonitoringID}
+	return &CameraImagesToCdf{cogClient: cogClient, globalCamPollingInterval: time.Second * 20, stateTracker: internal.NewStateTracker(), extractorID: extractoMonitoringID}
 }
 
 // Introduce reload command.
@@ -55,7 +55,7 @@ func (intgr *CameraImagesToCdf) startCdfConfigPolling() {
 // LoadConfigs load both static and dynamic configs
 func (intgr *CameraImagesToCdf) ReloadRemoteConfigs() error {
 	log.Debug("Reloading remote config")
-	filter := core.AssetFilter{Metadata: map[string]string{"cog_class": "camera", "state": "enabled"}}
+	filter := core.AssetFilter{Metadata: map[string]string{"cog_class": "camera", "state": "enabled", "extractor_id": intgr.extractorID}}
 
 	remoteAssetList, err := intgr.cogClient.Client().Assets.Filter(filter, 1000)
 	if err != nil {
@@ -145,7 +145,7 @@ func (intgr *CameraImagesToCdf) stopProcessor(procId uint64) {
 }
 
 func (intgr *CameraImagesToCdf) reportRunStatus(camExternalID, status, msg string) {
-	exRun := core.CreateExtractionRun{ExternalID: intgr.extractorMonitoringID, Status: status, Message: msg}
+	exRun := core.CreateExtractionRun{ExternalID: intgr.extractorID, Status: status, Message: msg}
 
 	intgr.cogClient.Client().ExtractionPipelines.CreateExtractionRuns(core.CreateExtractonRunsList{exRun})
 }
@@ -182,7 +182,7 @@ func (intgr *CameraImagesToCdf) startProcessor(asset core.Asset) error {
 	password := asset.Metadata["password"]
 	mode := asset.Metadata["mode"]
 
-	log.Infof(" Camera name = %s , model = %s , address = %s , username = %s , password = %s", asset.Name, model, address, username, password)
+	log.Infof(" Camera name = %s , model = %s , address = %s , username = %s , password = %s , mode = %s", asset.Name, model, address, username, password, mode)
 
 	if model == "" || address == "" {
 		log.Errorf("Processor can't be started for camera %s . Model or address aren't set.", asset.Name)
@@ -233,10 +233,12 @@ func (intgr *CameraImagesToCdf) startProcessor(asset core.Asset) error {
 
 		if mode == "camera+metadata" {
 			bmeta, err := cam.ExtractMetadata()
-			if err != nil {
-				log.Info("Metadata from camera:")
+			if err == nil {
+				log.Info("Fetching Metadata from camera:")
 				log.Info(string(bmeta))
 				intgr.reportRunStatus("", core.ExtractionRunStatusSuccess, string(bmeta))
+			} else {
+				log.Info("Failed to extract metadata . Err :", err.Error())
 			}
 		}
 

@@ -42,12 +42,41 @@ Supported camera drives :
 - Hikvision 
 - Reolink 
 - File system. 
+- Generic URL camera 
+- Fliw Ax8
 
 ### Configurations
 
 The service is using 2 types of configurations : 
 1. Static - loaded durign service startup . 
 2. Dynamic - loaded from remote endpoint , for instance from Asset metadata. 
+
+### Service CLI parameter 
+
+`--op` - operation , supported operations : 
+   - `run` - rund the service in command line 
+   - `install` - installs the service as windows , osx or linux service
+   - `uninstall` - uninstalls the service 
+   - `gen_config` - generates default config
+
+`--config <path_to_config_file>` - must be used to change default location of config file 
+`--bconfig <base64_encoded_string>` - base64 encoded config that can be passed to the application during startup 
+
+Examples : 
+
+`./edge-extractor --run --bconfig ewogICAgIlByb2plY3ROYW1lIjogIm1haW5zdHJlYW0tZGV2IiwKIC` 
+
+`./edge-extractor --install --bconfig ewogICAgIlByb2plY3ROYW1lIjogIm1haW5zdHJlYW0tZGV2IiwKIC`
+
+`./edge-extractor --run --config config_test.json`
+
+### Registering application as Windows service 
+
+1. Create folder `C:\Cognite\EdgeExtractor`
+2. Upload `edge-extractor` to the folder 
+3. Open Command Prompt and run command `cd C:\Cognite\EdgeExtractor` 
+4. Register `edge-extractor` as Windows service by running the command - `edge-extractor-win-amd64.exe --op install` or `edge-extractor-win-amd64.exe --op install --bconfig ewogICAgIlByb2plY3ROYW1lIjogIm1haW5zdHJlYW0tZGV2IiwKIC`
+
 
 ### Development 
 
