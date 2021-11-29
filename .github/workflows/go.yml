@@ -26,6 +26,7 @@ jobs:
       with:
         files: |
           edge-extractor-win-amd64.exe
+          edge-extractor-win-arm64.exe
           edge-extractor-linux-386
           edge-extractor-linux-amd64
           edge-extractor-osx-amd64

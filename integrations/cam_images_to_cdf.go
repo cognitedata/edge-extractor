@@ -2,6 +2,7 @@ package integrations
 
 import (
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	"github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core"
@@ -16,16 +17,18 @@ type CameraImagesToCdfConfig struct {
 type CameraImagesToCdf struct {
 	cogClient                *internal.CdfClient
 	isStarted                bool
-	cameraAssets             core.AssetList
 	stateTracker             *internal.StateTracker
 	globalCamPollingInterval time.Duration
 	successCounter           uint64
 	failureCounter           uint64
 	extractorID              string
+	configObserver           *internal.CdfConfigObserver
 }
 
 func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractoMonitoringID string) *CameraImagesToCdf {
-	return &CameraImagesToCdf{cogClient: cogClient, globalCamPollingInterval: time.Second * 20, stateTracker: internal.NewStateTracker(), extractorID: extractoMonitoringID}
+	ingr := &CameraImagesToCdf{cogClient: cogClient, globalCamPollingInterval: time.Second * 20, stateTracker: internal.NewStateTracker(), extractorID: extractoMonitoringID}
+	ingr.configObserver = internal.NewCdfConfigObserver(extractoMonitoringID, cogClient, ingr.restartProcessor, ingr.startProcessorLoop, ingr.stopProcessor)
+	return ingr
 }
 
 // Introduce reload command.
@@ -33,7 +36,7 @@ func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractoMonitoringID st
 func (intgr *CameraImagesToCdf) Start() error {
 	intgr.isStarted = true
 
-	go intgr.startCdfConfigPolling()
+	go intgr.configObserver.StartCdfConfigPolling()
 	go intgr.startSelfMonitoring()
 	return nil
 }
@@ -42,92 +45,11 @@ func (intgr *CameraImagesToCdf) Stop() {
 	intgr.isStarted = false
 }
 
-func (intgr *CameraImagesToCdf) startCdfConfigPolling() {
-	for {
-		intgr.ReloadRemoteConfigs()
-		time.Sleep(time.Second * 60)
-		if !intgr.isStarted {
-			break
-		}
-	}
-}
-
-// LoadConfigs load both static and dynamic configs
-func (intgr *CameraImagesToCdf) ReloadRemoteConfigs() error {
-	log.Debug("Reloading remote config")
-	filter := core.AssetFilter{Metadata: map[string]string{"cog_class": "camera", "state": "enabled", "extractor_id": intgr.extractorID}}
-
-	remoteAssetList, err := intgr.cogClient.Client().Assets.Filter(filter, 1000)
-	if err != nil {
-		return err
-	}
-	// comparing existing assets with assets in cdf , reloading processor if there is a difference
-	localAssetList := intgr.cameraAssets
-
-	// 1. asset is not present in master list - new asset has been added in CDF. Action - start new processor
-	// 2. asset is not present in slave list - asset has been deleted . Action - stop processor
-	// 3. asset present in both lists but metadata is defferent - asset has been updated . Action reload processor
-	// 4. assets are equal - Do nothing
-
-	var updatedRemoteAsset core.Asset
-	var isUpdated bool
-
-	for i := range localAssetList {
-		isEqual := false
-		isPresentRemotely := false
-		for i2 := range remoteAssetList {
-			if localAssetList[i].ID == remoteAssetList[i2].ID {
-				isPresentRemotely = true
-				if intgr.cogClient.CompareAssets(localAssetList[i], remoteAssetList[i2]) {
-					isEqual = true
-				} else {
-					updatedRemoteAsset = remoteAssetList[i2]
-				}
-				break
-			}
-		}
-
-		if !isPresentRemotely {
-			log.Infof("Remote change detected. Removing processor %d ", localAssetList[i].ID)
-			isUpdated = true
-			go intgr.stopProcessor(localAssetList[i].ID)
-
-		} else if isPresentRemotely && !isEqual {
-			log.Infof("Remote change detected. Restarting and updating processor %d", localAssetList[i].ID)
-			// Reload processor
-			isUpdated = true
-			go intgr.restartProcessor(updatedRemoteAsset)
-		}
-	}
-
-	// Comparing remote assets with local , starting processors for all new remote assets
-	for i3 := range remoteAssetList {
-		isPresent := false
-		for i4 := range localAssetList {
-			if localAssetList[i4].ID == remoteAssetList[i3].ID {
-				isPresent = true
-				break
-			}
-		}
-		if !isPresent {
-			isUpdated = true
-			log.Infof("Remote change detected. Starting new processor %d for camera %s", remoteAssetList[i3].ID, remoteAssetList[i3].Name)
-			go intgr.startProcessor(remoteAssetList[i3])
-		}
-
-	}
-	if isUpdated {
-		intgr.cameraAssets = remoteAssetList
-	}
-
-	return nil
-}
-
 func (intgr *CameraImagesToCdf) restartProcessor(asset core.Asset) {
 	intgr.stateTracker.SetProcessorTargetState(asset.ID, internal.ProcessorStateStopped)
 	if intgr.stateTracker.WaitForProcessorTargetState(asset.ID, time.Second*120) {
 		log.Infof("Processor %d has been stopped", asset.ID)
-		intgr.startProcessor(asset)
+		intgr.startProcessorLoop(asset)
 	} else {
 		log.Errorf("Failed to restart processor %d. Previous instance is still running", asset.ID)
 	}
@@ -145,8 +67,11 @@ func (intgr *CameraImagesToCdf) stopProcessor(procId uint64) {
 }
 
 func (intgr *CameraImagesToCdf) reportRunStatus(camExternalID, status, msg string) {
+	if r := recover(); r != nil {
+		stack := string(debug.Stack())
+		log.Error(" Pipeliene monitoring failed to load configuration from CDF with error : ", stack)
+	}
 	exRun := core.CreateExtractionRun{ExternalID: intgr.extractorID, Status: status, Message: msg}
-
 	intgr.cogClient.Client().ExtractionPipelines.CreateExtractionRuns(core.CreateExtractonRunsList{exRun})
 }
 
@@ -165,10 +90,14 @@ func (intgr *CameraImagesToCdf) startSelfMonitoring() {
 	}
 }
 
-// Start camera processor.
-func (intgr *CameraImagesToCdf) startProcessor(asset core.Asset) error {
+// startProcessor starts camera processor , the operation is blocking and must be started in its own goroute
+func (intgr *CameraImagesToCdf) startProcessorLoop(asset core.Asset) error {
 	log.Infof("Starting camera processor %d", asset.ID)
 	defer func() {
+		if r := recover(); r != nil {
+			stack := string(debug.Stack())
+			log.Error("startProcessor failed to start with error : ", stack)
+		}
 		intgr.stateTracker.SetProcessorCurrentState(asset.ID, internal.ProcessorStateStopped)
 	}()
 
@@ -196,31 +125,13 @@ func (intgr *CameraImagesToCdf) startProcessor(asset core.Asset) error {
 	}
 	intgr.stateTracker.SetProcessorCurrentState(asset.ID, internal.ProcessorStateRunning)
 	for {
-		// TODO : ADD extractor monitoring here.
-		img, err := cam.ExtractImage()
-		if err != nil {
-			log.Debugf("Can't extract image from camera model %s  . Error : %s", model, err.Error())
-			intgr.failureCounter++
-			intgr.reportRunStatus(asset.ExternalID, core.ExtractionRunStatusFailure, fmt.Sprintf("failed to extract img, err :%s", err.Error()))
-			time.Sleep(time.Second * 60)
-		} else {
-			timeStamp := time.Now().Format(time.RFC3339)
-			externalId := asset.Name + " " + timeStamp
-			fileName := externalId + ".jpeg"
-			err := intgr.cogClient.UploadInMemoryFile(img.Body, externalId, fileName, img.Format, asset.ID)
-			if err != nil {
-				log.Debug("Can't upload image. Error : ", err.Error())
-				intgr.failureCounter++
-				intgr.reportRunStatus(asset.ExternalID, core.ExtractionRunStatusFailure, fmt.Sprintf("failed to upload img, err :%s", err.Error()))
-				time.Sleep(time.Second * 60)
-			} else {
-				log.Debug("File uploaded to CDF successfully")
-				intgr.successCounter++
-			}
-		}
+
+		intgr.executeProcessorRun(asset, cam)
+
 		if !intgr.isStarted {
 			break
 		}
+
 		time.Sleep(intgr.globalCamPollingInterval)
 		st := intgr.stateTracker.GetProcessorState(asset.ID)
 		if st == nil {
@@ -232,18 +143,65 @@ func (intgr *CameraImagesToCdf) startProcessor(asset core.Asset) error {
 		}
 
 		if mode == "camera+metadata" {
-			bmeta, err := cam.ExtractMetadata()
-			if err == nil {
-				log.Info("Fetching Metadata from camera:")
-				log.Info(string(bmeta))
-				intgr.reportRunStatus("", core.ExtractionRunStatusSuccess, string(bmeta))
-			} else {
-				log.Info("Failed to extract metadata . Err :", err.Error())
-			}
+			intgr.executeCameraMetadataProcessorRun(asset, cam)
 		}
-
 	}
 	log.Infof("Processor %d exited main loop ", asset.ID)
 	return nil
+}
 
+func (intgr *CameraImagesToCdf) executeProcessorRun(asset core.Asset, cam *inputs.IpCamera) error {
+	defer func() {
+		if r := recover(); r != nil {
+			stack := string(debug.Stack())
+			log.Error("executeProcessorRun crashed with error : ", stack)
+			intgr.failureCounter++
+			intgr.reportRunStatus(asset.ExternalID, core.ExtractionRunStatusFailure, fmt.Sprintf("executeProcessorRun crashed with error :%s", stack))
+		}
+	}()
+
+	img, err := cam.ExtractImage()
+	if err != nil {
+		log.Debugf("Can't extract image from camera  %s  . Error : %s", asset.Name, err.Error())
+		intgr.failureCounter++
+		intgr.reportRunStatus(asset.ExternalID, core.ExtractionRunStatusFailure, fmt.Sprintf("failed to extract img, err :%s", err.Error()))
+		time.Sleep(time.Second * 60)
+	} else {
+		timeStamp := time.Now().Format(time.RFC3339)
+		externalId := asset.Name + " " + timeStamp
+		fileName := externalId + ".jpeg"
+		err := intgr.cogClient.UploadInMemoryFile(img.Body, externalId, fileName, img.Format, asset.ID)
+		if err != nil {
+			log.Debug("Can't upload image. Error : ", err.Error())
+			intgr.failureCounter++
+			intgr.reportRunStatus(asset.ExternalID, core.ExtractionRunStatusFailure, fmt.Sprintf("failed to upload img, err :%s", err.Error()))
+			time.Sleep(time.Second * 60)
+		} else {
+			log.Debug("File uploaded to CDF successfully")
+			intgr.successCounter++
+		}
+	}
+	return err
+}
+
+func (intgr *CameraImagesToCdf) executeCameraMetadataProcessorRun(asset core.Asset, cam *inputs.IpCamera) error {
+	defer func() {
+		if r := recover(); r != nil {
+			stack := string(debug.Stack())
+			log.Error("Camera metadata extraction crashed with error : ", stack)
+			intgr.failureCounter++
+			intgr.reportRunStatus(asset.ExternalID, core.ExtractionRunStatusFailure, fmt.Sprintf("camera metadata extraction crashed with error :%s", stack))
+		}
+	}()
+
+	bmeta, err := cam.ExtractMetadata()
+	if err == nil {
+		log.Info("Fetching Metadata from camera:")
+		log.Info(string(bmeta))
+		// This is just a test.
+		intgr.reportRunStatus("", core.ExtractionRunStatusSuccess, string(bmeta))
+	} else {
+		log.Info("Failed to extract metadata . Err :", err.Error())
+	}
+	return err
 }

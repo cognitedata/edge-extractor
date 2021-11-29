@@ -1,6 +1,9 @@
 package internal
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 const (
 	ProcessorStateRunning  = "RUNNING"
@@ -15,16 +18,20 @@ type ProcessorState struct {
 	TargetState  string
 }
 
+// StateTracker keep track of current and target states for all processors
 type StateTracker struct {
 	procStates []ProcessorState
+	mux        *sync.RWMutex
 }
 
 func NewStateTracker() *StateTracker {
-	return &StateTracker{}
+	return &StateTracker{mux: &sync.RWMutex{}}
 }
 
 func (intgr *StateTracker) SetProcessorTargetState(procId uint64, state string) {
-	st := intgr.GetProcessorState(procId)
+	intgr.mux.Lock()
+	defer intgr.mux.Unlock()
+	st := intgr.getProcessorState(procId)
 	if st == nil {
 		intgr.procStates = append(intgr.procStates, ProcessorState{ID: procId, TargetState: state})
 	} else {
@@ -33,7 +40,9 @@ func (intgr *StateTracker) SetProcessorTargetState(procId uint64, state string) 
 }
 
 func (intgr *StateTracker) SetProcessorCurrentState(procId uint64, state string) {
-	st := intgr.GetProcessorState(procId)
+	intgr.mux.Lock()
+	defer intgr.mux.Unlock()
+	st := intgr.getProcessorState(procId)
 	if st == nil {
 		intgr.procStates = append(intgr.procStates, ProcessorState{ID: procId, CurrentState: state})
 	} else {
@@ -41,7 +50,8 @@ func (intgr *StateTracker) SetProcessorCurrentState(procId uint64, state string)
 	}
 }
 
-func (intgr *StateTracker) GetProcessorState(procId uint64) *ProcessorState {
+// getProcessorState returns process state , the method is for internal use only
+func (intgr *StateTracker) getProcessorState(procId uint64) *ProcessorState {
 	for i := range intgr.procStates {
 		if intgr.procStates[i].ID == procId {
 			return &intgr.procStates[i]
@@ -50,6 +60,13 @@ func (intgr *StateTracker) GetProcessorState(procId uint64) *ProcessorState {
 	return nil
 }
 
+func (intgr *StateTracker) GetProcessorState(procId uint64) *ProcessorState {
+	intgr.mux.RLock()
+	defer intgr.mux.RUnlock()
+	return intgr.getProcessorState(procId)
+}
+
+// WaitForProcessorTargetState blocks execution untill processor reaches target or wait operation times out .
 func (intgr *StateTracker) WaitForProcessorTargetState(procId uint64, timeout time.Duration) bool {
 	endTime := time.Now().Add(timeout)
 	for {
