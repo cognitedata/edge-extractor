@@ -3,6 +3,7 @@ package integrations
 import (
 	"fmt"
 	"runtime/debug"
+	"strconv"
 	"time"
 
 	"github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core"
@@ -26,17 +27,42 @@ type CameraImagesToCdf struct {
 }
 
 func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractoMonitoringID string) *CameraImagesToCdf {
-	ingr := &CameraImagesToCdf{cogClient: cogClient, globalCamPollingInterval: time.Second * 20, stateTracker: internal.NewStateTracker(), extractorID: extractoMonitoringID}
-	ingr.configObserver = internal.NewCdfConfigObserver(extractoMonitoringID, cogClient, ingr.restartProcessor, ingr.startProcessorLoop, ingr.stopProcessor)
+	ingr := &CameraImagesToCdf{cogClient: cogClient, globalCamPollingInterval: time.Second * 30, stateTracker: internal.NewStateTracker(), extractorID: extractoMonitoringID}
+	ingr.configObserver = internal.NewCdfConfigObserver(extractoMonitoringID, cogClient)
 	return ingr
 }
 
-// Introduce reload command.
-
 func (intgr *CameraImagesToCdf) Start() error {
 	intgr.isStarted = true
+	filter := core.AssetFilter{Metadata: map[string]string{"cog_class": "camera", "extractor_id": intgr.extractorID}}
+	actionQueue := intgr.configObserver.Start(filter, 60*time.Second)
+	go func() {
+		for configAction := range actionQueue {
+			log.Debugf("New config action event . Action ID = %d ", configAction.Name)
+			switch configAction.Name {
+			case internal.RestartProcessorAction:
+				// this means metada has been changed .
+				if configAction.Asset.Metadata["state"] == "enabled" {
+					go intgr.restartProcessor(configAction.Asset)
+				} else {
+					log.Info("Camera has been disabled , sending STOP signal to processor")
+					go intgr.stopProcessor(configAction.ProcId)
+				}
 
-	go intgr.configObserver.StartCdfConfigPolling()
+			case internal.StartProcessorLoopAction:
+				if configAction.Asset.Metadata["state"] == "enabled" {
+					go intgr.startSingleCameraProcessorLoop(configAction.Asset)
+				} else {
+					log.Info("Camera is disabled , operation skipped")
+				}
+
+			case internal.StopProcessorAction:
+				go intgr.stopProcessor(configAction.ProcId)
+			default:
+				log.Infof("Unknown cofig action %d", configAction)
+			}
+		}
+	}()
 	go intgr.startSelfMonitoring()
 	return nil
 }
@@ -49,7 +75,7 @@ func (intgr *CameraImagesToCdf) restartProcessor(asset core.Asset) {
 	intgr.stateTracker.SetProcessorTargetState(asset.ID, internal.ProcessorStateStopped)
 	if intgr.stateTracker.WaitForProcessorTargetState(asset.ID, time.Second*120) {
 		log.Infof("Processor %d has been stopped", asset.ID)
-		intgr.startProcessorLoop(asset)
+		intgr.startSingleCameraProcessorLoop(asset)
 	} else {
 		log.Errorf("Failed to restart processor %d. Previous instance is still running", asset.ID)
 	}
@@ -75,6 +101,7 @@ func (intgr *CameraImagesToCdf) reportRunStatus(camExternalID, status, msg strin
 	intgr.cogClient.Client().ExtractionPipelines.CreateExtractionRuns(core.CreateExtractonRunsList{exRun})
 }
 
+// startSelfMonitoring run a status reporting look that periodically sends status reports to pipeline monitoring
 func (intgr *CameraImagesToCdf) startSelfMonitoring() {
 	for {
 		if intgr.successCounter > 0 && intgr.failureCounter == 0 {
@@ -91,7 +118,7 @@ func (intgr *CameraImagesToCdf) startSelfMonitoring() {
 }
 
 // startProcessor starts camera processor , the operation is blocking and must be started in its own goroute
-func (intgr *CameraImagesToCdf) startProcessorLoop(asset core.Asset) error {
+func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(asset core.Asset) error {
 	log.Infof("Starting camera processor %d", asset.ID)
 	defer func() {
 		if r := recover(); r != nil {
@@ -110,6 +137,18 @@ func (intgr *CameraImagesToCdf) startProcessorLoop(asset core.Asset) error {
 	username := asset.Metadata["username"]
 	password := asset.Metadata["password"]
 	mode := asset.Metadata["mode"]
+
+	pollingIntervalTmp, err := strconv.Atoi(asset.Metadata["polling_interval"]) // polling interval in seconds
+	var pollingInterval time.Duration
+
+	if err == nil {
+		log.Infof("Non-default polling interval = %d", pollingIntervalTmp)
+		pollingInterval = time.Duration(pollingIntervalTmp) * time.Second
+	}
+
+	if pollingInterval < 1 {
+		pollingInterval = intgr.globalCamPollingInterval
+	}
 
 	log.Infof(" Camera name = %s , model = %s , address = %s , username = %s , password = %s , mode = %s", asset.Name, model, address, username, password, mode)
 
@@ -131,8 +170,8 @@ func (intgr *CameraImagesToCdf) startProcessorLoop(asset core.Asset) error {
 		if !intgr.isStarted {
 			break
 		}
-
-		time.Sleep(intgr.globalCamPollingInterval)
+		// TODO : Randomize delays to distribute load
+		time.Sleep(pollingInterval)
 		st := intgr.stateTracker.GetProcessorState(asset.ID)
 		if st == nil {
 			break
@@ -150,6 +189,7 @@ func (intgr *CameraImagesToCdf) startProcessorLoop(asset core.Asset) error {
 	return nil
 }
 
+// executeProcessorRun
 func (intgr *CameraImagesToCdf) executeProcessorRun(asset core.Asset, cam *inputs.IpCamera) error {
 	defer func() {
 		if r := recover(); r != nil {
@@ -196,8 +236,8 @@ func (intgr *CameraImagesToCdf) executeCameraMetadataProcessorRun(asset core.Ass
 
 	bmeta, err := cam.ExtractMetadata()
 	if err == nil {
-		log.Info("Fetching Metadata from camera:")
-		log.Info(string(bmeta))
+		log.Debug("Fetching Metadata from camera:")
+		log.Debug(string(bmeta))
 		// This is just a test.
 		intgr.reportRunStatus("", core.ExtractionRunStatusSuccess, string(bmeta))
 	} else {

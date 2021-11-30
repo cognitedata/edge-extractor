@@ -60,6 +60,7 @@ func (intgr *StateTracker) getProcessorState(procId uint64) *ProcessorState {
 	return nil
 }
 
+// GetProcessorState public version of getProcessorState
 func (intgr *StateTracker) GetProcessorState(procId uint64) *ProcessorState {
 	intgr.mux.RLock()
 	defer intgr.mux.RUnlock()

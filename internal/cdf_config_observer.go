@@ -13,32 +13,66 @@ type RestartProcessor func(asset core.Asset)
 type StartProcessorLoop func(asset core.Asset) error
 type StopProcessor func(procId uint64)
 
+// const StartProcessorAction = 1
+const RestartProcessorAction = 2
+const StopProcessorAction = 3
+const StartProcessorLoopAction = 4
+
+// CdfConfigObserver is a component that is responsible for monitoring filtererd subset of CDF Assets for changes , if change being detected it restarts or stops linked processor .
+// If observer detects that the asset is present remotely and not locally , it calls startProcessorLoop function
+// If observer detects that the asset is not present remotelyu is calls stopProcessor function
+// If observer detect that Asset name or external_id or metadata have been chagned,it calls restartProcessor function.
 type CdfConfigObserver struct {
-	extractorID        string
-	isStarted          bool
-	cogClient          *CdfClient
-	localAssetsList    core.AssetList
-	restartProcessor   RestartProcessor
-	startProcessorLoop StartProcessorLoop
-	stopProcessor      StopProcessor
+	extractorID       string
+	isStarted         bool
+	cogClient         *CdfClient
+	localAssetsList   core.AssetList
+	assetFilter       core.AssetFilter
+	configActionQueue ConfigActionQueue
 }
 
-func NewCdfConfigObserver(extractorID string, cogClient *CdfClient, restartProcessor RestartProcessor, startProcessorLoop StartProcessorLoop, stopProcessor StopProcessor) *CdfConfigObserver {
-	return &CdfConfigObserver{extractorID: extractorID, cogClient: cogClient, restartProcessor: restartProcessor, startProcessorLoop: startProcessorLoop, stopProcessor: stopProcessor}
+type ConfigAction struct {
+	Name   int
+	Asset  core.Asset
+	ProcId uint64
 }
 
-func (intgr *CdfConfigObserver) StartCdfConfigPolling() {
-	for {
-		intgr.ReloadRemoteConfigs()
-		time.Sleep(time.Second * 60)
-		if !intgr.isStarted {
-			break
-		}
+type ConfigActionQueue chan ConfigAction
+
+func NewCdfConfigObserver(extractorID string, cogClient *CdfClient) *CdfConfigObserver {
+	configActionQueue := make(chan ConfigAction, 5)
+	return &CdfConfigObserver{extractorID: extractorID, cogClient: cogClient, configActionQueue: configActionQueue}
+}
+
+// Start starts observer process using provided asset filter and reload interval. The operation is non-blocking
+func (intgr *CdfConfigObserver) Start(assetFilter core.AssetFilter, reloadInterval time.Duration) ConfigActionQueue {
+	log.Info("Starting CDF config observer")
+	if reloadInterval == 0 {
+		reloadInterval = 60 * time.Second
 	}
+	intgr.isStarted = true
+	intgr.assetFilter = assetFilter
+	go func() {
+		for {
+			intgr.reloadRemoteConfigs()
+			time.Sleep(reloadInterval)
+			if !intgr.isStarted {
+				break
+			}
+		}
+		log.Info("CDF config loop has been terminated")
+	}()
+	return intgr.configActionQueue
+
 }
 
-// LoadConfigs load both static and dynamic configs
-func (intgr *CdfConfigObserver) ReloadRemoteConfigs() error {
+func (intgr *CdfConfigObserver) Stop() {
+	log.Info("Stopping CDF config observer")
+	intgr.isStarted = false
+}
+
+// reloadRemoteConfigs loads relote configuration from CDF , compares with local state and run actions (start/stop/restart) to match local state to target state .
+func (intgr *CdfConfigObserver) reloadRemoteConfigs() error {
 	defer func() {
 		if r := recover(); r != nil {
 			stack := string(debug.Stack())
@@ -47,9 +81,8 @@ func (intgr *CdfConfigObserver) ReloadRemoteConfigs() error {
 	}()
 
 	log.Debug("Reloading remote config")
-	filter := core.AssetFilter{Metadata: map[string]string{"cog_class": "camera", "state": "enabled", "extractor_id": intgr.extractorID}}
 
-	remoteAssetList, err := intgr.cogClient.Client().Assets.Filter(filter, 1000)
+	remoteAssetList, err := intgr.cogClient.Client().Assets.Filter(intgr.assetFilter, 1000)
 	if err != nil {
 		return err
 	}
@@ -59,6 +92,8 @@ func (intgr *CdfConfigObserver) ReloadRemoteConfigs() error {
 	// 2. asset is not present in slave list - asset has been deleted . Action - stop processor
 	// 3. asset present in both lists but metadata is defferent - asset has been updated . Action reload processor
 	// 4. assets are equal - Do nothing
+
+	log.Debug("Number of assets from CDF =", len(remoteAssetList))
 
 	var updatedRemoteAsset core.Asset
 	var isUpdated bool
@@ -81,13 +116,13 @@ func (intgr *CdfConfigObserver) ReloadRemoteConfigs() error {
 		if !isPresentRemotely {
 			log.Infof("Remote change detected. Removing processor %d ", intgr.localAssetsList[i].ID)
 			isUpdated = true
-			go intgr.stopProcessor(intgr.localAssetsList[i].ID)
+			intgr.configActionQueue <- ConfigAction{Name: StopProcessorAction, ProcId: intgr.localAssetsList[i].ID}
 
 		} else if isPresentRemotely && !isEqual {
 			log.Infof("Remote change detected. Restarting and updating processor %d", intgr.localAssetsList[i].ID)
 			// Reload processor
 			isUpdated = true
-			go intgr.restartProcessor(updatedRemoteAsset)
+			intgr.configActionQueue <- ConfigAction{Name: RestartProcessorAction, Asset: updatedRemoteAsset}
 		}
 	}
 
@@ -104,7 +139,7 @@ func (intgr *CdfConfigObserver) ReloadRemoteConfigs() error {
 			isUpdated = true
 			log.Infof("Remote change detected. Starting new processor %d for camera %s", remoteAssetList[i3].ID, remoteAssetList[i3].Name)
 			// The service starts separate processor for each camera.
-			go intgr.startProcessorLoop(remoteAssetList[i3])
+			intgr.configActionQueue <- ConfigAction{Name: StartProcessorLoopAction, Asset: remoteAssetList[i3]}
 		}
 
 	}

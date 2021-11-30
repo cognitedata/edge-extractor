@@ -1,4 +1,4 @@
-version="0.1.2"
+version="0.2.0"
 
 set_private_repos :
 	go get github.com/cognitedata/cognite-sdk-go

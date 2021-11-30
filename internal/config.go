@@ -13,4 +13,5 @@ type StaticConfig struct {
 
 	EnabledIntegrations []string
 	LogLevel            string
+	LogDir              string
 }

@@ -2,7 +2,6 @@ package internal
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -52,10 +51,10 @@ func (co *CdfClient) UploadFile(filePath, externalId, name, mimeType string, ass
 
 	uploadUrl, err := co.client.Files.Create(fileMetadata)
 	if err != nil {
-		fmt.Println("Upload error : ", err.Error())
+		log.Error("Upload error : ", err.Error())
 		return err
 	}
-	fmt.Println("Uploading file using URL:", uploadUrl)
+	log.Debug("Uploading file using URL:", uploadUrl)
 	return co.BasicUploadFileBody(filePath, name, mimeType, uploadUrl.UploadUrl)
 }
 
@@ -65,16 +64,16 @@ func (co *CdfClient) UploadInMemoryFile(body []byte, externalId, name, mimeType 
 
 	uploadUrl, err := co.client.Files.Create(fileMetadata)
 	if err != nil {
-		fmt.Println("Upload error : ", err.Error())
+		log.Error("Upload error : ", err.Error())
 		return err
 	}
-	fmt.Println("Uploading file using URL:", uploadUrl)
+	log.Debug("Uploading file using URL:", uploadUrl)
 	return co.UploadInMemoryBody(body, name, mimeType, uploadUrl.UploadUrl)
 }
 
 // UploadMultipartFileBody currently not supported by CDF
 func (co *CdfClient) UploadMultipartFileBody(filePath, fileName, mimeType, uploadUrl string) error {
-	fmt.Println("Uploading file")
+	log.Debug("Uploading file")
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -83,22 +82,22 @@ func (co *CdfClient) UploadMultipartFileBody(filePath, fileName, mimeType, uploa
 	mWriter := multipart.NewWriter(pWriter)
 
 	go func() {
-		fmt.Println("Copying content ")
+		log.Debug("Copying content ")
 		defer pWriter.Close()
 		defer mWriter.Close()
 		defer file.Close()
 
 		part, err := mWriter.CreateFormFile("fileName", fileName)
 		if err != nil {
-			fmt.Println("Error form file ", err.Error())
+			log.Error("Error form file ", err.Error())
 			return
 		}
 
 		if _, err = io.Copy(part, file); err != nil {
-			fmt.Println("Error pipe  ", err.Error())
+			log.Error("Error pipe  ", err.Error())
 			return
 		}
-		fmt.Println("Copy is done")
+		log.Debug("Copy is done")
 	}()
 
 	req, err := http.NewRequest("PUT", uploadUrl, pReader)
@@ -110,20 +109,20 @@ func (co *CdfClient) UploadMultipartFileBody(filePath, fileName, mimeType, uploa
 	}
 
 	hClient := &http.Client{}
-	fmt.Println("Sending HTTP request")
+	log.Debug("Sending HTTP request")
 	resp, err := hClient.Do(req)
 
 	if err != nil {
 		return err
 	}
-	fmt.Println("Http response status code ", resp.Status)
+	log.Debug("Http response status code ", resp.Status)
 	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("Response :", string(body))
+	log.Debug("Response :", string(body))
 	if resp.Body != nil {
 		resp.Body.Close()
 	}
@@ -133,7 +132,7 @@ func (co *CdfClient) UploadMultipartFileBody(filePath, fileName, mimeType, uploa
 }
 
 func (co *CdfClient) BasicUploadFileBody(filePath, fileName, mimeType, uploadUrl string) error {
-	fmt.Println("Uploading file")
+	log.Debug("Uploading file")
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -142,7 +141,7 @@ func (co *CdfClient) BasicUploadFileBody(filePath, fileName, mimeType, uploadUrl
 	stat, _ := file.Stat()
 	fileSize := stat.Size()
 
-	fmt.Println("File size :", fileSize)
+	log.Debug("File size :", fileSize)
 
 	defer file.Close()
 
@@ -159,7 +158,7 @@ func (co *CdfClient) BasicUploadFileBody(filePath, fileName, mimeType, uploadUrl
 	if err != nil {
 		return err
 	}
-	fmt.Println("Http response status code ", resp.Status)
+	log.Debug("Http response status code ", resp.Status)
 
 	body, err := io.ReadAll(resp.Body)
 
@@ -167,7 +166,7 @@ func (co *CdfClient) BasicUploadFileBody(filePath, fileName, mimeType, uploadUrl
 		return err
 	}
 
-	fmt.Println("Response :", string(body))
+	log.Debug("Response :", string(body))
 	if resp.Body != nil {
 		resp.Body.Close()
 	}
@@ -177,7 +176,7 @@ func (co *CdfClient) BasicUploadFileBody(filePath, fileName, mimeType, uploadUrl
 }
 
 func (co *CdfClient) UploadInMemoryBody(body []byte, fileName, mimeType, uploadUrl string) error {
-	fmt.Println("Uploading file")
+	log.Debug("Uploading file")
 	buf := bytes.NewReader(body)
 
 	req, err := http.NewRequest("PUT", uploadUrl, buf)
@@ -192,7 +191,7 @@ func (co *CdfClient) UploadInMemoryBody(body []byte, fileName, mimeType, uploadU
 	if err != nil {
 		return err
 	}
-	fmt.Println("Http response status code ", resp.Status)
+	log.Debug("Http response status code ", resp.Status)
 
 	respBody, err := io.ReadAll(resp.Body)
 
@@ -200,7 +199,7 @@ func (co *CdfClient) UploadInMemoryBody(body []byte, fileName, mimeType, uploadU
 		return err
 	}
 
-	fmt.Println("Response :", string(respBody))
+	log.Debug("Response :", string(respBody))
 	if resp.Body != nil {
 		resp.Body.Close()
 	}

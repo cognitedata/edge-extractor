@@ -75,13 +75,15 @@ func configureLogger(logPath, level string) {
 		FullTimestamp:   true,
 	})
 	// open a file
-	logPath = filepath.Join(logPath, "edge-extractor.log")
-	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0666)
-	if err != nil {
-		fmt.Printf("error opening file: %v", err)
-		systemLog.Error("Failed to create log , err :" + err.Error())
+	if logPath != "" && logPath != "-" {
+		logPath = filepath.Join(logPath, "edge-extractor.log")
+		f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0666)
+		if err != nil {
+			fmt.Printf("error opening file: %v", err)
+			systemLog.Error("Failed to create log , err :" + err.Error())
+		}
+		log.SetOutput(f)
 	}
-	log.SetOutput(f)
 
 }
 
@@ -103,8 +105,11 @@ func startEdgeExtractor(mainConfigPath string) {
 		// TODO : Start config ui webserver here
 		return
 	}
-
-	configureLogger(internal.GetBinaryDir(), config.LogLevel)
+	logDir := internal.GetBinaryDir()
+	if config.LogDir != "" {
+		logDir = config.LogDir
+	}
+	configureLogger(logDir, config.LogLevel)
 
 	cdfCLient := internal.NewCdfClient(config.ProjectName, config.CdfCluster, config.ClientID, config.Secret, config.Scopes, config.AdTenantId, config.AuthTokenUrl, config.CdfDatasetID)
 
