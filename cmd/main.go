@@ -18,7 +18,13 @@ import (
 var Version string
 var systemLog service.Logger
 var fullConfigPath string
-var integrReg map[string]interface{}
+
+type Integration interface {
+	Start() error
+	Stop()
+}
+
+var integrReg map[string]Integration
 
 type program struct{}
 
@@ -113,17 +119,27 @@ func startEdgeExtractor(mainConfigPath string) {
 
 	cdfCLient := internal.NewCdfClient(config.ProjectName, config.CdfCluster, config.ClientID, config.Secret, config.Scopes, config.AdTenantId, config.AuthTokenUrl, config.CdfDatasetID)
 
-	integrReg = make(map[string]interface{})
+	integrReg = make(map[string]Integration)
 
 	for _, integrName := range config.EnabledIntegrations {
 		switch integrName {
 		case "ip_cams_to_cdf":
 			intgr := integrations.NewCameraImagesToCdf(cdfCLient, config.ExtractorID)
+			intgr.SetLocalConfig(config.LocalIntegrationConfig)
 			err = intgr.Start()
 			if err != nil {
 				log.Errorf(" %s integration can't be started . Error : %s", integrName, err.Error())
 			} else {
 				integrReg["ip_cams_to_cdf"] = intgr
+			}
+		case "local_files_to_cdf":
+			intgr := integrations.NewLocalFilesToCdf(cdfCLient, config.ExtractorID)
+			intgr.SetLocalConfig(config.LocalIntegrationConfig)
+			err = intgr.Start()
+			if err != nil {
+				log.Errorf(" %s integration can't be started . Error : %s", integrName, err.Error())
+			} else {
+				integrReg["local_files_to_cdf"] = intgr
 			}
 
 		}
@@ -131,8 +147,9 @@ func startEdgeExtractor(mainConfigPath string) {
 }
 
 func stopExtractor() {
-	intgr := integrReg["ip_cams_to_cdf"].(*integrations.CameraImagesToCdf)
-	intgr.Stop()
+	for _, intgr := range integrReg {
+		intgr.Stop()
+	}
 }
 
 func main() {

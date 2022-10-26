@@ -57,3 +57,7 @@ func (cam *ReolinkCameraDriver) ExtractMetadata(address, username, password stri
 func (cam *ReolinkCameraDriver) Ping(address string) bool {
 	return true
 }
+
+func (cam *ReolinkCameraDriver) Commit(transactionId string) error {
+	return nil
+}

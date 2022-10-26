@@ -48,3 +48,10 @@ func (cam *IpCamera) ExtractMetadata() ([]byte, error) {
 	}
 	return cam.driver.ExtractMetadata(cam.address, cam.username, cam.password)
 }
+
+func (cam *IpCamera) Commit(transactionId string) error {
+	if cam.driver == nil {
+		return fmt.Errorf("unknown driver")
+	}
+	return cam.driver.Commit(transactionId)
+}

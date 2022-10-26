@@ -81,3 +81,7 @@ func (cam *AxisCameraDriver) ExtractMetadata(address, username, password string)
 func (cam *AxisCameraDriver) Ping(address string) bool {
 	return true
 }
+
+func (cam *AxisCameraDriver) Commit(transactionId string) error {
+	return nil
+}

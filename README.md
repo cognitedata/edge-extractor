@@ -45,6 +45,11 @@ Supported camera drives :
 - Generic URL camera 
 - Fliw Ax8
 
+### Implemented integrations 
+
+- ip_cams_to_cdf 
+- local_files_to_cdf
+
 ### Configurations
 
 The service is using 2 types of configurations : 
@@ -77,6 +82,65 @@ Examples :
 3. Open Command Prompt and run command `cd C:\Cognite\EdgeExtractor` 
 4. Register `edge-extractor` as Windows service by running the command - `edge-extractor-win-amd64.exe --op install` or `edge-extractor-win-amd64.exe --op install --bconfig ewogICAgIlByb2plY3ROYW1lIjogIm1haW5zdHJlYW0tZGV2IiwKIC`
 
+
+### Config file 
+
+Minimal local config , all cameras configured remotely.
+
+````
+{
+    "ExtractorID":"edge-extractor-dev-1",
+    "ProjectName": "_set_your_project_name_here",
+    "CdfCluster": "westeurope-1",
+    "AdTenantId": "176a22cf-3d72-4b07-a4f8-0841557a570c",
+    "AuthTokenUrl": "https://login.microsoftonline.com/176a22cf-3d72-4b07-a4f8-0841557a570c/oauth2/v2.0/token",
+    "ClientID": "_set_your_client_id_here_",
+    "Secret": "_set_your_client_secret_here_",
+    "Scopes": [
+      "https://westeurope-1.cognitedata.com/.default"
+    ],
+    "CdfDatasetID": 866030833773755,
+    "EnabledIntegrations": [
+      "ip_cams_to_cdf"
+    ],
+    "LogLevel":"debug",
+    "LogDir":"-",  
+  }
+````
+Local config
+
+````
+{
+    "ExtractorID":"edge-extractor-dev-1",
+    "ProjectName": "_set_your_project_name_here",
+    "CdfCluster": "westeurope-1",
+    "AdTenantId": "176a22cf-3d72-4b07-a4f8-0841557a570c",
+    "AuthTokenUrl": "https://login.microsoftonline.com/176a22cf-3d72-4b07-a4f8-0841557a570c/oauth2/v2.0/token",
+    "ClientID": "_set_your_client_id_here_",
+    "Secret": "_set_your_client_secret_here_",
+    "Scopes": [
+      "https://westeurope-1.cognitedata.com/.default"
+    ],
+    "CdfDatasetID": 866030833773755,
+    "EnabledIntegrations": [
+      "local_files_to_cdf"
+    ],
+    "LogLevel":"debug",
+    "LogDir":"-",
+
+    "LocalIntegrationConfig": {
+      "id":403447394704254,
+      "name":"local_uploader",
+      "metadata": {
+        "cog_model":"fscam",
+        "uri":"./imgdump",
+        "polling_interval":"0",
+        "max_parallel_runs":"3"
+      }
+      
+    }
+  }
+````
 
 ### Development 
 

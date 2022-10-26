@@ -82,3 +82,7 @@ func (cam *HikvisionCameraDriver) ExtractMetadata(address, username, password st
 func (cam *HikvisionCameraDriver) Ping(address string) bool {
 	return true
 }
+
+func (cam *HikvisionCameraDriver) Commit(transactionId string) error {
+	return nil
+}
