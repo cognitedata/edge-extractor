@@ -56,3 +56,7 @@ func (cam *UrlCameraDriver) ExtractMetadata(address, username, password string) 
 func (cam *UrlCameraDriver) Ping(address string) bool {
 	return true
 }
+
+func (cam *UrlCameraDriver) Commit(transactionId string) error {
+	return nil
+}
