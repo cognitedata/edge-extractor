@@ -17,12 +17,13 @@ type IpCamera struct {
 
 func NewIpCamera(model, address, cType, username, password string) *IpCamera {
 	driverCon := map[string]camera.DriverConstructor{
-		"fscam":      camera.NewFileSystemCameraDriver,
-		"axis":       camera.NewAxisCameraDriver,
-		"hikvision":  camera.NewHikvisionCameraDriver,
-		"reolink":    camera.NewReolinkCameraDriver,
-		"urlcam":     camera.NewUrlCameraDriver,
-		"flir_ax8":   camera.NewFlirAx8CameraDriver,
+		"fscam":     camera.NewFileSystemCameraDriver,
+		"axis":      camera.NewAxisCameraDriver,
+		"hikvision": camera.NewHikvisionCameraDriver,
+		"reolink":   camera.NewReolinkCameraDriver,
+		"urlcam":    camera.NewUrlCameraDriver,
+		"flir_ax8":  camera.NewFlirAx8CameraDriver,
+		"dahua":     camera.NewDahuaCameraDriver,
 	}
 
 	driver := driverCon[model]

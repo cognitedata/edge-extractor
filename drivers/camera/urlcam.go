@@ -2,7 +2,7 @@ package camera
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -22,7 +22,17 @@ func NewUrlCameraDriver() Driver {
 
 func (cam *UrlCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
 
-	resp, err := cam.httpClient.Get(address)
+	// resp, err := cam.httpClient.Get(address)
+
+	req, err := http.NewRequest("GET", address, nil)
+	if err != nil {
+		return nil, err
+	}
+	if username != "" && password != "" {
+		req.SetBasicAuth(username, password)
+	}
+	resp, err := cam.httpClient.Do(req)
+
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +41,7 @@ func (cam *UrlCameraDriver) ExtractImage(address, username, password string) (*I
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("camera api returned error code %s", resp.Status)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
 		return nil, err

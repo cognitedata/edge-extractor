@@ -11,21 +11,23 @@ import (
 	dac "github.com/xinsnake/go-http-digest-auth-client"
 )
 
-type AxisCameraDriver struct {
+type DahuaCameraDriver struct {
 	httpClient      http.Client
 	digestTransport *dac.DigestTransport
 }
 
-func NewAxisCameraDriver() Driver {
+func NewDahuaCameraDriver() Driver {
 	httpClient := http.Client{
 		Timeout: 15 * time.Second,
 	}
-	return &AxisCameraDriver{httpClient: httpClient}
+	return &DahuaCameraDriver{httpClient: httpClient}
 }
 
-func (cam *AxisCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
-	//"http://10.22.15.62/axis-cgi/jpg/image.cgi"
-	address = address + "/axis-cgi/jpg/image.cgi"
+func (cam *DahuaCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
+	// http://10.22.15.61/cgi-bin/snapshot.cgi
+
+	address = address + "/cgi-bin/snapshot.cgi"
+
 	if cam.digestTransport == nil {
 		t := dac.NewTransport(username, password)
 		cam.digestTransport = &t
@@ -41,7 +43,6 @@ func (cam *AxisCameraDriver) ExtractImage(address, username, password string) (*
 	if err != nil {
 		return nil, err
 	}
-
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -65,14 +66,14 @@ func (cam *AxisCameraDriver) ExtractImage(address, username, password string) (*
 	return &img, nil
 }
 
-func (cam *AxisCameraDriver) ExtractMetadata(address, username, password string) ([]byte, error) {
+func (cam *DahuaCameraDriver) ExtractMetadata(address, username, password string) ([]byte, error) {
 	return nil, nil
 }
 
-func (cam *AxisCameraDriver) Ping(address string) bool {
+func (cam *DahuaCameraDriver) Ping(address string) bool {
 	return true
 }
 
-func (cam *AxisCameraDriver) Commit(transactionId string) error {
+func (cam *DahuaCameraDriver) Commit(transactionId string) error {
 	return nil
 }

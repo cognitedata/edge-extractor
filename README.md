@@ -44,6 +44,7 @@ Supported camera drives :
 - File system. 
 - Generic URL camera 
 - Fliw Ax8
+- Dahua
 
 ### Implemented integrations 
 
@@ -73,7 +74,13 @@ Examples :
 
 `./edge-extractor --install --bconfig ewogICAgIlByb2plY3ROYW1lIjogIm1haW5zdHJlYW0tZGV2IiwKIC`
 
-`./edge-extractor --run --config config_test.json`
+`./edge-extractor --op run --config config_test.json`
+
+`./edge-extractor --op install --config config_test.json`
+
+`./edge-extractor --op uninstall`
+
+`./edge-extractor --op gen_config`
 
 ### Registering application as Windows service 
 
@@ -128,7 +135,7 @@ Local config
     "LogLevel":"debug",
     "LogDir":"-",
 
-    "LocalIntegrationConfig": {
+    "LocalIntegrationConfig": [{
       "id":403447394704254,
       "name":"local_uploader",
       "metadata": {
@@ -138,7 +145,7 @@ Local config
         "max_parallel_runs":"3"
       }
       
-    }
+    }]
   }
 ````
 

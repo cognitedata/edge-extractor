@@ -17,5 +17,5 @@ type StaticConfig struct {
 	LogLevel            string
 	LogDir              string
 
-	LocalIntegrationConfig *core.Asset
+	LocalIntegrationConfig []core.Asset
 }

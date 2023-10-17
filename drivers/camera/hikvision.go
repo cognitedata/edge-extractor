@@ -2,7 +2,7 @@ package camera
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -57,7 +57,7 @@ func (cam *HikvisionCameraDriver) ExtractImage(address, username, password strin
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("camera api returned error code %s", resp.Status)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
 		return nil, err

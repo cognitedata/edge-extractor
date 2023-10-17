@@ -22,7 +22,7 @@ type LocalFilesToCdf struct {
 	failureCounter           uint64
 	extractorID              string
 	configObserver           *internal.CdfConfigObserver // remote config observer
-	localConfig              *core.Asset                 // local configuration
+	localConfig              []core.Asset                // local configuration
 }
 
 func NewLocalFilesToCdf(cogClient *internal.CdfClient, extractoMonitoringID string) *LocalFilesToCdf {
@@ -31,7 +31,7 @@ func NewLocalFilesToCdf(cogClient *internal.CdfClient, extractoMonitoringID stri
 	return ingr
 }
 
-func (intgr *LocalFilesToCdf) SetLocalConfig(localConfig *core.Asset) {
+func (intgr *LocalFilesToCdf) SetLocalConfig(localConfig []core.Asset) {
 	intgr.localConfig = localConfig
 }
 
@@ -39,7 +39,9 @@ func (intgr *LocalFilesToCdf) Start() error {
 	intgr.isStarted = true
 	if intgr.localConfig != nil {
 		log.Info("Starting LocalFilesToCdf processing loop using local configurations")
-		go intgr.startSingleCameraProcessorLoop(*intgr.localConfig)
+		for _, asset := range intgr.localConfig {
+			go intgr.startSingleCameraProcessorLoop(asset)
+		}
 	} else {
 		log.Info("Starting LocalFilesToCdf processing loop using remote configurations")
 		filter := core.AssetFilter{Metadata: map[string]string{"cog_class": "camera", "extractor_id": intgr.extractorID}}
@@ -67,7 +69,7 @@ func (intgr *LocalFilesToCdf) Start() error {
 				case internal.StopProcessorAction:
 					go intgr.stopProcessor(configAction.ProcId)
 				default:
-					log.Infof("Unknown cofig action %d", configAction)
+					log.Infof("Unknown cofig action %+v", configAction)
 				}
 			}
 		}()

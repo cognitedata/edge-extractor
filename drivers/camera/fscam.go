@@ -2,7 +2,6 @@ package camera
 
 import (
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -65,7 +64,7 @@ func (cam *FileSystemCameraDriver) ExtractImage(address, username, password stri
 
 // processFile reads the file , reads binary content into memory and returns the image
 func (cam *FileSystemCameraDriver) processFile(filePath string) (*Image, error) {
-	body, err := ioutil.ReadFile(filePath)
+	body, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
