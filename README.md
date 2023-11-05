@@ -120,7 +120,7 @@ Minimal local config , all cameras configured remotely.
     "LogDir":"-",  
   }
 ````
-Local config
+Local config , all configurations loaded from local config files.
 
 ````
 {
@@ -154,6 +154,11 @@ Local config
     }]
   }
 ````
+
+By default Secret and all password fields (in camera config section) are stored in plain text , to make it more secure the extractor also supports encrypted mode.
+To encrypt the config file run `edge-extractor --op encrypt_config` command , this will encrypt Secret and all password fields in config file and encrypted version
+will be saved to the same configuration file. Create a copy of unencrypted config file before running the command. 
+
 
 ### Extractor monitoring 
 
