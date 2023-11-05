@@ -2,7 +2,7 @@ package camera
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -32,7 +32,7 @@ func (cam *ReolinkCameraDriver) ExtractImage(address, username, password string)
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("camera api returned error code %s", resp.Status)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
 		return nil, err
@@ -56,4 +56,8 @@ func (cam *ReolinkCameraDriver) ExtractMetadata(address, username, password stri
 
 func (cam *ReolinkCameraDriver) Ping(address string) bool {
 	return true
+}
+
+func (cam *ReolinkCameraDriver) Commit(transactionId string) error {
+	return nil
 }

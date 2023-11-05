@@ -23,7 +23,8 @@ type CameraImagesToCdf struct {
 	successCounter           uint64
 	failureCounter           uint64
 	extractorID              string
-	configObserver           *internal.CdfConfigObserver
+	configObserver           *internal.CdfConfigObserver // remote config observer
+	localConfig              []core.Asset                // local configuration
 }
 
 func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractoMonitoringID string) *CameraImagesToCdf {
@@ -32,37 +33,50 @@ func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractoMonitoringID st
 	return ingr
 }
 
+func (intgr *CameraImagesToCdf) SetLocalConfig(localConfig []core.Asset) {
+	intgr.localConfig = localConfig
+}
+
 func (intgr *CameraImagesToCdf) Start() error {
 	intgr.isStarted = true
-	filter := core.AssetFilter{Metadata: map[string]string{"cog_class": "camera", "extractor_id": intgr.extractorID}}
-	actionQueue := intgr.configObserver.Start(filter, 60*time.Second)
-	go func() {
-		for configAction := range actionQueue {
-			log.Debugf("New config action event . Action ID = %d ", configAction.Name)
-			switch configAction.Name {
-			case internal.RestartProcessorAction:
-				// this means metada has been changed .
-				if configAction.Asset.Metadata["state"] == "enabled" {
-					go intgr.restartProcessor(configAction.Asset)
-				} else {
-					log.Info("Camera has been disabled , sending STOP signal to processor")
-					go intgr.stopProcessor(configAction.ProcId)
-				}
-
-			case internal.StartProcessorLoopAction:
-				if configAction.Asset.Metadata["state"] == "enabled" {
-					go intgr.startSingleCameraProcessorLoop(configAction.Asset)
-				} else {
-					log.Info("Camera is disabled , operation skipped")
-				}
-
-			case internal.StopProcessorAction:
-				go intgr.stopProcessor(configAction.ProcId)
-			default:
-				log.Infof("Unknown cofig action %d", configAction)
-			}
+	if intgr.localConfig != nil {
+		log.Info("Starting processing loop using local configurations")
+		for _, asset := range intgr.localConfig {
+			go intgr.startSingleCameraProcessorLoop(asset)
 		}
-	}()
+
+	} else {
+		log.Info("Starting processing loop using remote configurations")
+		filter := core.AssetFilter{Metadata: map[string]string{"cog_class": "camera", "extractor_id": intgr.extractorID}}
+		actionQueue := intgr.configObserver.Start(filter, 60*time.Second)
+		go func() {
+			for configAction := range actionQueue {
+				log.Debugf("New config action event . Action ID = %d ", configAction.Name)
+				switch configAction.Name {
+				case internal.RestartProcessorAction:
+					// this means metada has been changed .
+					if configAction.Asset.Metadata["state"] == "enabled" {
+						go intgr.restartProcessor(configAction.Asset)
+					} else {
+						log.Info("Camera has been disabled , sending STOP signal to processor")
+						go intgr.stopProcessor(configAction.ProcId)
+					}
+
+				case internal.StartProcessorLoopAction:
+					if configAction.Asset.Metadata["state"] == "enabled" {
+						go intgr.startSingleCameraProcessorLoop(configAction.Asset)
+					} else {
+						log.Info("Camera is disabled , operation skipped")
+					}
+
+				case internal.StopProcessorAction:
+					go intgr.stopProcessor(configAction.ProcId)
+				default:
+					log.Infof("Unknown cofig action %+v", configAction)
+				}
+			}
+		}()
+	}
 	go intgr.startSelfMonitoring()
 	return nil
 }
@@ -207,6 +221,11 @@ func (intgr *CameraImagesToCdf) executeProcessorRun(asset core.Asset, cam *input
 		intgr.reportRunStatus(asset.ExternalID, core.ExtractionRunStatusFailure, fmt.Sprintf("failed to extract img, err :%s", err.Error()))
 		time.Sleep(time.Second * 60)
 	} else {
+		if img == nil {
+			time.Sleep(time.Second * 10)
+			return nil
+		}
+
 		timeStamp := time.Now().Format(time.RFC3339)
 		externalId := asset.Name + " " + timeStamp
 		fileName := externalId + ".jpeg"

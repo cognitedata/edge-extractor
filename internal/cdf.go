@@ -47,7 +47,10 @@ func (co *CdfClient) Client() *cognite.Client {
 
 func (co *CdfClient) UploadFile(filePath, externalId, name, mimeType string, assetId uint64) error {
 
-	fileMetadata := core.CreateFileMetadata{ExternalId: externalId, Name: name, MimeType: mimeType, AssetIds: []uint64{assetId}, DataSetId: co.dataSetId}
+	fileMetadata := core.CreateFileMetadata{ExternalId: externalId, Name: name, MimeType: mimeType, DataSetId: co.dataSetId}
+	if assetId != 0 {
+		fileMetadata.AssetIds = []uint64{assetId}
+	}
 
 	uploadUrl, err := co.client.Files.Create(fileMetadata)
 	if err != nil {
@@ -60,7 +63,10 @@ func (co *CdfClient) UploadFile(filePath, externalId, name, mimeType string, ass
 
 func (co *CdfClient) UploadInMemoryFile(body []byte, externalId, name, mimeType string, assetId uint64) error {
 
-	fileMetadata := core.CreateFileMetadata{ExternalId: externalId, Name: name, MimeType: mimeType, AssetIds: []uint64{assetId}, DataSetId: co.dataSetId}
+	fileMetadata := core.CreateFileMetadata{ExternalId: externalId, Name: name, MimeType: mimeType, DataSetId: co.dataSetId}
+	if assetId != 0 {
+		fileMetadata.AssetIds = []uint64{assetId}
+	}
 
 	uploadUrl, err := co.client.Files.Create(fileMetadata)
 	if err != nil {

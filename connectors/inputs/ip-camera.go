@@ -17,12 +17,13 @@ type IpCamera struct {
 
 func NewIpCamera(model, address, cType, username, password string) *IpCamera {
 	driverCon := map[string]camera.DriverConstructor{
-		"fscam":      camera.NewFileSystemCameraDriver,
-		"axis":       camera.NewAxisCameraDriver,
-		"hickvision": camera.NewHikvisionCameraDriver,
-		"reolink":    camera.NewReolinkCameraDriver,
-		"urlcam":     camera.NewUrlCameraDriver,
-		"flir_ax8":   camera.NewFlirAx8CameraDriver,
+		"fscam":     camera.NewFileSystemCameraDriver,
+		"axis":      camera.NewAxisCameraDriver,
+		"hikvision": camera.NewHikvisionCameraDriver,
+		"reolink":   camera.NewReolinkCameraDriver,
+		"urlcam":    camera.NewUrlCameraDriver,
+		"flir_ax8":  camera.NewFlirAx8CameraDriver,
+		"dahua":     camera.NewDahuaCameraDriver,
 	}
 
 	driver := driverCon[model]
@@ -47,4 +48,11 @@ func (cam *IpCamera) ExtractMetadata() ([]byte, error) {
 		return nil, fmt.Errorf("unknown driver")
 	}
 	return cam.driver.ExtractMetadata(cam.address, cam.username, cam.password)
+}
+
+func (cam *IpCamera) Commit(transactionId string) error {
+	if cam.driver == nil {
+		return fmt.Errorf("unknown driver")
+	}
+	return cam.driver.Commit(transactionId)
 }

@@ -1,5 +1,7 @@
 package internal
 
+import "github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core"
+
 type StaticConfig struct {
 	ProjectName  string
 	CdfCluster   string
@@ -14,4 +16,6 @@ type StaticConfig struct {
 	EnabledIntegrations []string
 	LogLevel            string
 	LogDir              string
+
+	LocalIntegrationConfig []core.Asset
 }

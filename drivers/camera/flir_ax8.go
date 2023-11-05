@@ -91,3 +91,7 @@ func (cam *FlirAx8CameraDriver) ExtractMetadata(address, username, password stri
 func (cam *FlirAx8CameraDriver) Ping(address string) bool {
 	return true
 }
+
+func (cam *FlirAx8CameraDriver) Commit(transactionId string) error {
+	return nil
+}
