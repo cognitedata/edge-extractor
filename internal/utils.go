@@ -44,10 +44,10 @@ func GetBinaryDir() string {
 }
 
 func EncryptString(key, text string) (string, error) {
-	// Convert key to 16 bytes
+	// Convert key to 32 bytes
 	keyBytes := []byte(key)
-	if len(keyBytes) != 16 {
-		return "", errors.New("key must be 16 bytes")
+	if len(keyBytes) != 32 {
+		return "", errors.New("key must be 32 bytes")
 	}
 
 	// Convert text to bytes
@@ -59,26 +59,29 @@ func EncryptString(key, text string) (string, error) {
 		return "", err
 	}
 
-	// Generate a new random IV
-	iv := make([]byte, aes.BlockSize)
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		return "", err
+	//Create a new GCM - https://en.wikipedia.org/wiki/Galois/Counter_Mode
+	//https://golang.org/pkg/crypto/cipher/#NewGCM
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		panic(err.Error())
 	}
 
-	// Encrypt the text using the AES cipher and IV
-	stream := cipher.NewCTR(block, iv)
-	stream.XORKeyStream(textBytes, textBytes)
+	//Create a nonce. Nonce should be from GCM
+	nonce := make([]byte, aesGCM.NonceSize())
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		panic(err.Error())
+	}
 
-	// Combine the IV and encrypted text into a single string
-	encrypted := append(iv, textBytes...)
-	return base64.URLEncoding.EncodeToString(encrypted), nil
+	//Encrypt the data using aesGCM.Seal
+	ciphertext := aesGCM.Seal(nonce, nonce, textBytes, nil)
+	return base64.URLEncoding.EncodeToString(ciphertext), nil
 }
 
 func DecryptString(key, text string) (string, error) {
-	// Convert key to 16 bytes
+	// Convert key to 32 bytes
 	keyBytes := []byte(key)
-	if len(keyBytes) != 16 {
-		return "", errors.New("key must be 16 bytes")
+	if len(keyBytes) != 32 {
+		return "", errors.New("key must be 32 bytes")
 	}
 
 	// Convert text to bytes
@@ -87,19 +90,29 @@ func DecryptString(key, text string) (string, error) {
 		return "", err
 	}
 
-	// Generate a new AES cipher using the key
+	//Create a new Cipher Block from the key
 	block, err := aes.NewCipher(keyBytes)
 	if err != nil {
-		return "", err
+		panic(err.Error())
 	}
 
-	// Separate the IV and encrypted text
-	iv := textBytes[:aes.BlockSize]
-	textBytes = textBytes[aes.BlockSize:]
+	//Create a new GCM
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		panic(err.Error())
+	}
 
-	// Decrypt the text using the AES cipher and IV
-	stream := cipher.NewCTR(block, iv)
-	stream.XORKeyStream(textBytes, textBytes)
+	//Get the nonce size
+	nonceSize := aesGCM.NonceSize()
 
-	return string(textBytes), nil
+	//Extract the nonce from the encrypted data
+	nonce, ciphertext := textBytes[:nonceSize], textBytes[nonceSize:]
+
+	//Decrypt the data
+	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return string(plaintext), nil
 }

@@ -15,7 +15,7 @@ import (
 )
 
 var Version string
-var EncriptionKey string
+var EncryptionKey = ""
 var systemLog service.Logger
 var fullConfigPath string
 
@@ -193,6 +193,7 @@ func main() {
 
 	base64encodedConfig := flag.String("bconfig", "", "Base64 encoded config")
 	op := flag.String("op", "", "Supported operations : 'gen_config,install,uninstall,run' ")
+	textToEncrypt := flag.String("secret", "", "Secret to encrypt")
 
 	flag.Parse()
 
@@ -215,7 +216,12 @@ func main() {
 		os.WriteFile("config.json", body, 0644)
 	}
 
-	internal.Key = ""
+	internal.Key = EncryptionKey
+	if EncryptionKey != "" {
+		log.Info("Encryption key is set . Will try to decrypt config file")
+	} else {
+		log.Info("Encryption key is not set .")
+	}
 
 	switch *op {
 	case "gen_config":
@@ -230,11 +236,11 @@ func main() {
 	case "version":
 		fmt.Println(Version)
 
-	case "encrypt":
-		// if EncriptionKey == "" {
-		// 	fmt.Println("Please provide encryption key")
-		// 	return
-		// }
+	case "encrypt_config":
+		if EncryptionKey == "" {
+			fmt.Println("Please provide encryption key")
+			return
+		}
 
 		err := encryptConfig(*mainConfigPath)
 		if err != nil {
@@ -242,6 +248,22 @@ func main() {
 		}
 		fmt.Println("Config file has been encrypted")
 		return
+
+	case "encrypt_secret":
+		if EncryptionKey == "" {
+			fmt.Println("Please provide encryption key")
+			return
+		}
+		if *textToEncrypt == "" {
+			fmt.Println("Please provide text to encrypt")
+			return
+		}
+		encrypted, err := internal.EncryptString(internal.Key, *textToEncrypt)
+		if err != nil {
+			fmt.Println("Failed to encrypt string. Err:", err.Error())
+			return
+		}
+		fmt.Println("Encrypted string : ", encrypted)
 
 	case "install":
 		log.Info("Installing edge-extractor service")

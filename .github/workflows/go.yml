@@ -1,8 +1,8 @@
 name: Go
 
 on:
-  push:
-    branches: [ main ]
+  # push:
+  #   branches: [ main ]
   release:
     types: [published]
 
@@ -20,6 +20,8 @@ jobs:
 
     - name: build artifacts
       run: make build-multios
+      env:
+        CONFIG_ENCRYPTION_KEY: ${{ secrets.CONFIG_ENCRYPTION_KEY }}
       
     - name: Release
       uses: softprops/action-gh-release@v1
