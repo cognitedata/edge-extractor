@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -16,6 +15,7 @@ import (
 )
 
 var Version string
+var EncryptionKey = ""
 var systemLog service.Logger
 var fullConfigPath string
 
@@ -93,12 +93,37 @@ func configureLogger(logPath, level string) {
 
 }
 
-func startEdgeExtractor(mainConfigPath string) {
+func encryptConfig(configPath string) error {
 	var config internal.StaticConfig
-	configBody, err := ioutil.ReadFile(mainConfigPath)
+	configBody, err := os.ReadFile(configPath)
 
 	if err != nil {
-		log.Error("Application is not configured. Either add configuraion file or use configuraion UI to configure the application")
+		systemLog.Error("Failed to load config file. Err:", err.Error())
+		// TODO : Start config ui webserver here
+		return err
+	}
+
+	err = json.Unmarshal(configBody, &config)
+	if err != nil {
+		systemLog.Error("Incorrect config file format. Err:", err.Error())
+		// TODO : Start config ui webserver here
+		return err
+	}
+	err = config.Encrypt()
+	if err != nil {
+		systemLog.Error("Failed to encrypt config file. Err:", err.Error())
+		return err
+	}
+	body, _ := json.MarshalIndent(&config, " ", "  ")
+	os.WriteFile("config.json", body, 0644)
+	return nil
+}
+
+func startEdgeExtractor(mainConfigPath string) {
+	var config internal.StaticConfig
+	configBody, err := os.ReadFile(mainConfigPath)
+
+	if err != nil {
 		systemLog.Error("Failed to load config file. Err:", err.Error())
 		// TODO : Start config ui webserver here
 		return
@@ -106,16 +131,24 @@ func startEdgeExtractor(mainConfigPath string) {
 
 	err = json.Unmarshal(configBody, &config)
 	if err != nil {
-		log.Error("Incorrect config file")
 		systemLog.Error("Incorrect config file format. Err:", err.Error())
 		// TODO : Start config ui webserver here
 		return
 	}
+
 	logDir := internal.GetBinaryDir()
 	if config.LogDir != "" {
 		logDir = config.LogDir
 	}
 	configureLogger(logDir, config.LogLevel)
+
+	err = config.Decrypt()
+	if err != nil {
+		log.Error("Failed to decrypt config file. Err:", err.Error())
+		return
+	}
+
+	log.Infof("Starting edge-extractor service. Secret = %s", config.Secret)
 
 	cdfCLient := internal.NewCdfClient(config.ProjectName, config.CdfCluster, config.ClientID, config.Secret, config.Scopes, config.AdTenantId, config.AuthTokenUrl, config.CdfDatasetID)
 
@@ -160,6 +193,7 @@ func main() {
 
 	base64encodedConfig := flag.String("bconfig", "", "Base64 encoded config")
 	op := flag.String("op", "", "Supported operations : 'gen_config,install,uninstall,run' ")
+	textToEncrypt := flag.String("secret", "", "Secret to encrypt")
 
 	flag.Parse()
 
@@ -176,10 +210,17 @@ func main() {
 		// Base64 Standard Decoding
 		body, err := base64.StdEncoding.DecodeString(*base64encodedConfig)
 		if err != nil {
-			log.Error("Error decoding base64 encoded config: %s ", err.Error())
+			log.Errorf("Error decoding base64 encoded config: %s ", err.Error())
 			return
 		}
-		ioutil.WriteFile("config.json", body, 0644)
+		os.WriteFile("config.json", body, 0644)
+	}
+
+	internal.Key = EncryptionKey
+	if EncryptionKey != "" {
+		log.Info("Encryption key is set . Will try to decrypt config file")
+	} else {
+		log.Info("Encryption key is not set .")
 	}
 
 	switch *op {
@@ -190,8 +231,40 @@ func main() {
 		config.AuthTokenUrl = "https://login.microsoftonline.com/set_your_tenant_id_here/oauth2/v2.0/token"
 		config.EnabledIntegrations = []string{"ip_cams_to_cdf"}
 		body, _ := json.MarshalIndent(&config, " ", "  ")
-		ioutil.WriteFile("config.json", body, 0644)
+		os.WriteFile("config.json", body, 0644)
 		return
+	case "version":
+		fmt.Println(Version)
+
+	case "encrypt_config":
+		if EncryptionKey == "" {
+			fmt.Println("Please provide encryption key")
+			return
+		}
+
+		err := encryptConfig(*mainConfigPath)
+		if err != nil {
+			fmt.Println("Failed to encrypt config file. Err:", err.Error())
+		}
+		fmt.Println("Config file has been encrypted")
+		return
+
+	case "encrypt_secret":
+		if EncryptionKey == "" {
+			fmt.Println("Please provide encryption key")
+			return
+		}
+		if *textToEncrypt == "" {
+			fmt.Println("Please provide text to encrypt")
+			return
+		}
+		encrypted, err := internal.EncryptString(internal.Key, *textToEncrypt)
+		if err != nil {
+			fmt.Println("Failed to encrypt string. Err:", err.Error())
+			return
+		}
+		fmt.Println("Encrypted string : ", encrypted)
+
 	case "install":
 		log.Info("Installing edge-extractor service")
 		appService := configureService()

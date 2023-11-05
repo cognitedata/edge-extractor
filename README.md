@@ -64,6 +64,8 @@ The service is using 2 types of configurations :
    - `install` - installs the service as windows , osx or linux service
    - `uninstall` - uninstalls the service 
    - `gen_config` - generates default config
+   - `encrypt_config` - encrypts all Secret and password field in config file
+   - `encrypt_secret` - encrypts secret provided as `secret` CLI parameter and outputs encrypted value to stdout
 
 `--config <path_to_config_file>` - must be used to change default location of config file 
 `--bconfig <base64_encoded_string>` - base64 encoded config that can be passed to the application during startup 
@@ -81,6 +83,10 @@ Examples :
 `./edge-extractor --op uninstall`
 
 `./edge-extractor --op gen_config`
+
+`./edge-extractor --op encrypt_config`
+
+`./edge-extractor --op encrypt_secret --secret my_secret`
 
 ### Registering application as Windows service 
 
@@ -114,7 +120,7 @@ Minimal local config , all cameras configured remotely.
     "LogDir":"-",  
   }
 ````
-Local config
+Local config , all configurations loaded from local config files.
 
 ````
 {
@@ -134,7 +140,7 @@ Local config
     ],
     "LogLevel":"debug",
     "LogDir":"-",
-
+    "IsEncrypted": false,
     "LocalIntegrationConfig": [{
       "id":403447394704254,
       "name":"local_uploader",
@@ -149,6 +155,17 @@ Local config
   }
 ````
 
-### Development 
+By default Secret and all password fields (in camera config section) are stored in plain text , to make it more secure the extractor also supports encrypted mode.
+To encrypt the config file run `edge-extractor --op encrypt_config` command , this will encrypt Secret and all password fields in config file and encrypted version
+will be saved to the same configuration file. Create a copy of unencrypted config file before running the command. 
+
+
+### Extractor monitoring 
+
+The extractor can be monitored remotely via CDF extraction pipelines. Exraction pipelines must be created in CDF upfront (via CDF Fusion or using SDK) and 
+extractor pipeline ExternalID must match `ExtractorID` in config above.
+
+More information about CDF extraction pipelines can be found [here](https://docs.cognite.com/cdf/integration/guides/interfaces/monitor_integrations/) 
+
 
 TBD
