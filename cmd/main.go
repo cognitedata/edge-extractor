@@ -148,7 +148,7 @@ func startEdgeExtractor(mainConfigPath string) {
 		return
 	}
 
-	log.Infof("Starting edge-extractor service. Secret = %s", config.Secret)
+	log.Info("Starting edge-extractor service.")
 
 	cdfCLient := internal.NewCdfClient(config.ProjectName, config.CdfCluster, config.ClientID, config.Secret, config.Scopes, config.AdTenantId, config.AuthTokenUrl, config.CdfDatasetID)
 
