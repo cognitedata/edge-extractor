@@ -1,4 +1,4 @@
-version="0.4.0"
+version="0.4.1"
 encryption_key=${CONFIG_ENCRYPTION_KEY}
 set_private_repos :
 	go get github.com/cognitedata/cognite-sdk-go
