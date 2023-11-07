@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core"
