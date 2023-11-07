@@ -166,7 +166,7 @@ func (intgr *LocalFilesToCdf) startSingleCameraProcessorLoop(asset core.Asset) e
 		maxParallelRuns = 1
 	}
 
-	log.Infof(" Camera name = %s , model = %s , address = %s , username = %s , password = %s , mode = %s , max parallel runs = %d", asset.Name, model, address, username, password, mode, maxParallelRuns)
+	log.Infof("Camera name = %s, model = %s, address = %s, username = %s, mode = %s, max parallel runs = %d", asset.Name, model, address, username, mode, maxParallelRuns)
 
 	if model == "" || address == "" {
 		log.Errorf("Processor can't be started for camera %s . Model or address aren't set.", asset.Name)
