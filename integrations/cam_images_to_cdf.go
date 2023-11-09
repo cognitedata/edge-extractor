@@ -164,7 +164,7 @@ func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(asset core.Asset)
 		pollingInterval = intgr.globalCamPollingInterval
 	}
 
-	log.Infof(" Camera name = %s , model = %s , address = %s , username = %s , password = %s , mode = %s", asset.Name, model, address, username, password, mode)
+	log.Infof("Camera name = %s, model = %s, address = %s, username = %s, mode = %s", asset.Name, model, address, username, mode)
 
 	if model == "" || address == "" {
 		log.Errorf("Processor can't be started for camera %s . Model or address aren't set.", asset.Name)
