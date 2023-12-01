@@ -19,6 +19,18 @@ func (datapoints *DatapointList) ConvertToCreateDatapoints(timeSerieID uint64) C
 	}
 }
 
+func (datapoints *DatapointList) ConvertToCreateDatapointsExt(timeSerieIDExternal string) CreateDatapoints {
+	createDatapointList := CreateDatapointsInTimeSerieList{
+		CreateDatapointsInTimeSerie{
+			Datapoints:          *datapoints,
+			TimeSerieExternalID: timeSerieIDExternal,
+		},
+	}
+	return CreateDatapoints{
+		Items: createDatapointList,
+	}
+}
+
 type DatapointsFilter struct {
 	Items                DatapointsQuery `json:"items,omitempty"`
 	Start                int64           `json:"start,omitempty"`

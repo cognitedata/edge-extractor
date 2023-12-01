@@ -25,9 +25,9 @@ type LocalFilesToCdf struct {
 	localConfig              []core.Asset                // local configuration
 }
 
-func NewLocalFilesToCdf(cogClient *internal.CdfClient, extractoMonitoringID string) *LocalFilesToCdf {
+func NewLocalFilesToCdf(cogClient *internal.CdfClient, extractoMonitoringID string, remoteConfigSource string) *LocalFilesToCdf {
 	ingr := &LocalFilesToCdf{cogClient: cogClient, globalCamPollingInterval: time.Second * 30, stateTracker: internal.NewStateTracker(), extractorID: extractoMonitoringID}
-	ingr.configObserver = internal.NewCdfConfigObserver(extractoMonitoringID, cogClient)
+	ingr.configObserver = internal.NewCdfConfigObserver(extractoMonitoringID, cogClient, remoteConfigSource)
 	return ingr
 }
 

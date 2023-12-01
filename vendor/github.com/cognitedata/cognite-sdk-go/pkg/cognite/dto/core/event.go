@@ -61,6 +61,7 @@ func (eventList *EventList) ConvertToCreateEvents() CreateEvents {
 			Description: evt.Description,
 			Metadata:    evt.Metadata,
 			Source:      evt.Source,
+			AssetsIds:   evt.AssetsIds,
 		}
 		createEventList = append(createEventList, createEvent)
 	}
@@ -84,7 +85,7 @@ type CreateEvent struct {
 	Subtype     string            `json:"subtype,omitempty"`
 	Description string            `json:"description"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
-	AssetsIds   []uint64          `json:"assetsIds,omitempty"`
+	AssetsIds   []uint64          `json:"assetIds,omitempty"`
 	Source      string            `json:"source,omitempty"`
 }
 

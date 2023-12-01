@@ -27,9 +27,9 @@ type CameraImagesToCdf struct {
 	localConfig              []core.Asset                // local configuration
 }
 
-func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractoMonitoringID string) *CameraImagesToCdf {
+func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractoMonitoringID string, remoteConfigSource string) *CameraImagesToCdf {
 	ingr := &CameraImagesToCdf{cogClient: cogClient, globalCamPollingInterval: time.Second * 30, stateTracker: internal.NewStateTracker(), extractorID: extractoMonitoringID}
-	ingr.configObserver = internal.NewCdfConfigObserver(extractoMonitoringID, cogClient)
+	ingr.configObserver = internal.NewCdfConfigObserver(extractoMonitoringID, cogClient, remoteConfigSource)
 	return ingr
 }
 
@@ -64,6 +64,7 @@ func (intgr *CameraImagesToCdf) Start() error {
 
 				case internal.StartProcessorLoopAction:
 					if configAction.Asset.Metadata["state"] == "enabled" {
+						log.Info("Camera has been enabled , sending START signal to processor")
 						go intgr.startSingleCameraProcessorLoop(configAction.Asset)
 					} else {
 						log.Info("Camera is disabled , operation skipped")

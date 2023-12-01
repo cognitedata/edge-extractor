@@ -4,7 +4,7 @@ set_private_repos :
 	go get github.com/cognitedata/cognite-sdk-go
 
 run :
-	go run cmd/main.go
+	go run cmd/main.go -config config.json
 
 build : 
 	go build -o edge-extractor -ldflags="-X main.Version=${version} -X main.EncryptionKey=${encryption_key}" cmd/main.go

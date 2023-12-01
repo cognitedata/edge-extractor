@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"runtime/debug"
 	"time"
 
@@ -23,12 +24,13 @@ const StartProcessorLoopAction = 4
 // If observer detects that the asset is not present remotelyu is calls stopProcessor function
 // If observer detect that Asset name or external_id or metadata have been chagned,it calls restartProcessor function.
 type CdfConfigObserver struct {
-	extractorID       string
-	isStarted         bool
-	cogClient         *CdfClient
-	localAssetsList   core.AssetList
-	assetFilter       core.AssetFilter
-	configActionQueue ConfigActionQueue
+	extractorID        string
+	isStarted          bool
+	cogClient          *CdfClient
+	localAssetsList    core.AssetList
+	assetFilter        core.AssetFilter
+	configActionQueue  ConfigActionQueue
+	remoteConfigSource string // assets, ext_pipeline_config
 }
 
 type ConfigAction struct {
@@ -39,14 +41,14 @@ type ConfigAction struct {
 
 type ConfigActionQueue chan ConfigAction
 
-func NewCdfConfigObserver(extractorID string, cogClient *CdfClient) *CdfConfigObserver {
+func NewCdfConfigObserver(extractorID string, cogClient *CdfClient, remoteConfigSource string) *CdfConfigObserver {
 	configActionQueue := make(chan ConfigAction, 5)
-	return &CdfConfigObserver{extractorID: extractorID, cogClient: cogClient, configActionQueue: configActionQueue}
+	return &CdfConfigObserver{extractorID: extractorID, cogClient: cogClient, configActionQueue: configActionQueue, remoteConfigSource: remoteConfigSource}
 }
 
 // Start starts observer process using provided asset filter and reload interval. The operation is non-blocking
 func (intgr *CdfConfigObserver) Start(assetFilter core.AssetFilter, reloadInterval time.Duration) ConfigActionQueue {
-	log.Info("Starting CDF config observer")
+	log.Info("Starting CDF config observer, remote config source = ", intgr.remoteConfigSource)
 	if reloadInterval == 0 {
 		reloadInterval = 60 * time.Second
 	}
@@ -54,7 +56,10 @@ func (intgr *CdfConfigObserver) Start(assetFilter core.AssetFilter, reloadInterv
 	intgr.assetFilter = assetFilter
 	go func() {
 		for {
-			intgr.reloadRemoteConfigs()
+			err := intgr.reloadRemoteConfigs()
+			if err != nil {
+				log.Error("Failed to reload remote configs with error : ", err)
+			}
 			time.Sleep(reloadInterval)
 			if !intgr.isStarted {
 				break
@@ -82,10 +87,30 @@ func (intgr *CdfConfigObserver) reloadRemoteConfigs() error {
 
 	log.Debug("Reloading remote config")
 
-	remoteAssetList, err := intgr.cogClient.Client().Assets.Filter(intgr.assetFilter, 1000)
-	if err != nil {
-		return err
+	var remoteAssetList core.AssetList
+	var err error
+
+	if intgr.remoteConfigSource == "assets" {
+		remoteAssetList, err = intgr.cogClient.Client().Assets.Filter(intgr.assetFilter, 1000)
+		if err != nil {
+			return err
+		}
+	} else if intgr.remoteConfigSource == "ext_pipeline_config" {
+		remoteConfig, err := intgr.cogClient.Client().ExtractionPipelines.GetRemoteConfig(intgr.extractorID)
+		if err != nil {
+			return err
+		}
+
+		err = json.Unmarshal([]byte(remoteConfig.Config), &remoteAssetList)
+		if err != nil {
+			return err
+		}
+
+	} else {
+		log.Error("Unknown remote config source")
+		return nil
 	}
+
 	// comparing existing assets with assets in cdf , reloading processor if there is a difference
 
 	// 1. asset is not present in master list - new asset has been added in CDF. Action - start new processor

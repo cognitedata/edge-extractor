@@ -1,4 +1,4 @@
-# github.com/cognitedata/cognite-sdk-go v0.3.2-0.20211022150037-c6aa1283f946
+# github.com/cognitedata/cognite-sdk-go v0.3.2-0.20211022150037-c6aa1283f946 => ../../cognite-sdk-go
 ## explicit; go 1.13
 github.com/cognitedata/cognite-sdk-go/pkg/cognite
 github.com/cognitedata/cognite-sdk-go/pkg/cognite/api
@@ -86,3 +86,4 @@ google.golang.org/protobuf/reflect/protoreflect
 google.golang.org/protobuf/reflect/protoregistry
 google.golang.org/protobuf/runtime/protoiface
 google.golang.org/protobuf/runtime/protoimpl
+# github.com/cognitedata/cognite-sdk-go => ../../cognite-sdk-go

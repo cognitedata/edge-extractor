@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"net/url"
 
 	"github.com/cognitedata/cognite-sdk-go/pkg/cognite/api"
 	"github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core"
@@ -42,4 +43,21 @@ func (extp *ExtractionPipelines) CreateExtractionRuns(extractionRunsList core.Cr
 		return errors.Wrap(err, "Unable to unmarshal struct in Create() Assets")
 	}
 	return nil
+}
+
+func (extp *ExtractionPipelines) GetRemoteConfig(extractorExternalId string) (*core.ConfigRessponse, error) {
+	params :=  url.Values{}
+	params.Add("externalId", extractorExternalId)
+	body, err := extp.apiClient.GetWithParams("extpipes/config" , params)
+	var response = new(core.ConfigRessponse)
+	if err != nil {
+		return response, err
+	}
+	
+	
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		return response, errors.Wrap(err, "Unable to unmarshal struct in GetRemoteConfig()")
+	}
+	return response, nil
 }

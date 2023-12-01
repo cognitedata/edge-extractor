@@ -157,7 +157,7 @@ func startEdgeExtractor(mainConfigPath string) {
 	for _, integrName := range config.EnabledIntegrations {
 		switch integrName {
 		case "ip_cams_to_cdf":
-			intgr := integrations.NewCameraImagesToCdf(cdfCLient, config.ExtractorID)
+			intgr := integrations.NewCameraImagesToCdf(cdfCLient, config.ExtractorID, config.RemoteConfigSource)
 			intgr.SetLocalConfig(config.LocalIntegrationConfig)
 			err = intgr.Start()
 			if err != nil {
@@ -166,7 +166,7 @@ func startEdgeExtractor(mainConfigPath string) {
 				integrReg["ip_cams_to_cdf"] = intgr
 			}
 		case "local_files_to_cdf":
-			intgr := integrations.NewLocalFilesToCdf(cdfCLient, config.ExtractorID)
+			intgr := integrations.NewLocalFilesToCdf(cdfCLient, config.ExtractorID, config.RemoteConfigSource)
 			intgr.SetLocalConfig(config.LocalIntegrationConfig)
 			err = intgr.Start()
 			if err != nil {

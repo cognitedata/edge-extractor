@@ -240,3 +240,5 @@ func (co *CdfClient) CompareAssets(asset1, asset2 core.Asset) bool {
 	return true
 
 }
+
+
