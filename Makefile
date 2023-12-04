@@ -34,6 +34,10 @@ build-osx-arm:
 
 build-multios: build-windows build-windows-arm64 build-linux-386 build-linux-amd64 build-linux-arm build-osx-intel build-osx-arm
 
+build-docker:
+	docker build -t cognite/edge-extractor:${version} -t cognite/edge-extractor:latest .
 
+test-docker:
+	docker run -it --rm --name edge-extractor cognite/edge-extractor:${version} 
 prepare-test-data:
 	cp imgdump-src/* imgdump/

@@ -27,16 +27,9 @@ Integration process
 
 - CDF output 
 
-### Integration processes 
-
-- Camera to CDF . The process loads configurations from CDF asset -> requests images from each IP camera -> uploads images to CDF Files and link them to camera asset
-- Local storage file to CDF. The process loads images from SD a card or different local storage, uploads images to CDF Files, and links them to camera assets.
-
-All processes support parallel data retrieval from multiple devices. 
-
 ### Device drivers 
 
-Supported camera drives : 
+Supported camera drivers : 
 
 - Axis 
 - Hikvision 
@@ -46,18 +39,61 @@ Supported camera drives :
 - Fliw Ax8
 - Dahua
 
-### Implemented integrations 
-
-- ip_cams_to_cdf 
-- local_files_to_cdf
-
 ### Configurations
 
 The service is using 2 types of configurations : 
 1. Static - loaded durign service startup . 
-2. Dynamic - loaded from remote endpoint , for instance from Asset metadata. 
+2. Dynamic - loaded from remote endpoint (CDF) during service startup and periodically updated. Supported remote sources : CDF Assets , CDF Extraction pipelines configs.
 
-### Service CLI parameter 
+#### Static configuration
+
+Static configuration is loaded from local config file (JSON) and contains information about CDF project , CDF cluster , CDF dataset , CDF authentication , etc.
+
+Parameter | ENV_VAR | Description | Example
+--- | --- | --- | ---
+`ExtractorID` | EDGE_EXT_EXTRACTOR_ID | Unique ID of the extractor | `edge-extractor-dev-1`
+`ProjectName` | EDGE_EXT_CDF_PROJECT_NAME | Name of the CDF project | `my-project`
+`CdfCluster` | EDGE_EXT_CDF_CLUSTER | Name of the CDF cluster | `westeurope-1`
+`AdTenantId` | EDGE_EXT_AD_TENANT_ID | Azure AD tenant ID | `176a22cf-3d72-4b07-a4f8-0841557a570c`
+`AuthTokenUrl` | EDGE_EXT_AD_AUTH_TOKEN_URL | Azure AD token endpoint URL | `https://login.microsoftonline.com/176a22cf-3d72-4b07-a4f8-0841557a570c/oauth2/v2.0/token`
+`ClientID` | EDGE_EXT_AD_CLIENT_ID | Azure AD client ID | `176a22cf-3d72-4b07-a4f8-0841557a570c`
+`Secret` | EDGE_EXT_AD_SECRET | Azure AD client secret | `176a22cf-3d72-4b07-a4f8-0841557a570c`
+`Scopes` | EDGE_EX_AD_SCOPES | Azure AD scopes | `https://westeurope-1.cognitedata.com/.default`
+`CdfDatasetID` | EDGE_EXT_CDF_DATASET_ID | CDF dataset ID | `866030833773755`
+`EnabledIntegrations` | EDGE_EXT_ENABLED_INTEGRATIONS | List of enabled integrations | `ip_cams_to_cdf`
+`LogLevel` | EDGE_EXT_LOG_LEVEL | Log level | `debug`
+`IsEncrypted` | EDGE_EXT_IS_ENCRYPTED | Is config encrypted (true/false) | `false`
+
+
+### Supported integrations 
+
+#### ip_cams_to_cdf 
+The process connects to each IP camera and uploads images to CDF Files and link them to camera asset.
+The processes supports parallel data retrieval from multiple devices. 
+
+Configurations : 
+
+Parameter | Description | Example
+--- | --- | ---
+`name` | Name of the camera | `camera-1`
+`id` | ID of Asset that repsents camera . All images are linked to that Asset if configured | 403447394704254
+`metadata.cog_model` | Camera model (from the list of supported camera drivers) | `axis`
+`metadata.uri` | Camera endpoint URI | `http://10.22.15.62` , `rtsp://` , `./imgdump`
+`metadata.polling_interval` | Polling interval in seconds | `10`
+`metadata.max_parallel_runs` | Max number of parallel runs | `3`
+`metadata.username` | Username | `admin`
+`metadata.password` | Password | `admin`
+`metadata.is_password_encrypted` | Is password encrypted or stored in plain text (true/false) | `false`
+`metadata.state` | State of the camera (enabled/disabled) | `enabled`
+
+
+#### local_files_to_cdf
+
+The process loads images from SD a card or different local storage, uploads images to CDF Files, and links them to camera assets.
+The processes supports parallel data retrieval from multiple devices. 
+
+
+### Service CLI parameters
 
 `--op` - operation , supported operations : 
    - `run` - rund the service in command line 
@@ -160,7 +196,7 @@ To encrypt the config file run `edge-extractor --op encrypt_config` command , th
 will be saved to the same configuration file. Create a copy of unencrypted config file before running the command. 
 
 
-### Extractor monitoring 
+### Extractor monitoring and remote configuration
 
 The extractor can be monitored remotely via CDF extraction pipelines. Exraction pipelines must be created in CDF upfront (via CDF Fusion or using SDK) and 
 extractor pipeline ExternalID must match `ExtractorID` in config above.
