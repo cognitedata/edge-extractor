@@ -1,4 +1,4 @@
-package integrations
+package local_files_to_cdf
 
 import (
 	"fmt"

@@ -35,7 +35,7 @@ type CdfConfigObserver struct {
 
 type ConfigAction struct {
 	Name   int
-	Asset  core.Asset
+	Config interface{}
 	ProcId uint64
 }
 
@@ -87,11 +87,8 @@ func (intgr *CdfConfigObserver) reloadRemoteConfigs() error {
 
 	log.Debug("Reloading remote config")
 
-	var remoteAssetList core.AssetList
-	var err error
-
 	if intgr.remoteConfigSource == "assets" {
-		remoteAssetList, err = intgr.cogClient.Client().Assets.Filter(intgr.assetFilter, 1000)
+		remoteAssetList, err := intgr.cogClient.Client().Assets.Filter(intgr.assetFilter, 1000)
 		if err != nil {
 			return err
 		}

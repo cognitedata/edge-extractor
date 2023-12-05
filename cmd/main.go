@@ -8,7 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cognitedata/edge-extractor/integrations"
+	"github.com/cognitedata/edge-extractor/integrations/cam_images_to_cdf"
+	"github.com/cognitedata/edge-extractor/integrations/local_files_to_cdf"
 	"github.com/cognitedata/edge-extractor/internal"
 	"github.com/kardianos/service"
 	log "github.com/sirupsen/logrus"
@@ -109,7 +110,9 @@ func encryptConfig(configPath string) error {
 		// TODO : Start config ui webserver here
 		return err
 	}
-	err = config.Encrypt()
+	secretManager := internal.NewSecretManager(EncryptionKey)
+	secretManager.LoadEncryptedSecrets(config.Secrets)
+	config.Secrets = secretManager.GetEncryptedSecrets()
 	if err != nil {
 		systemLog.Error("Failed to encrypt config file. Err:", err.Error())
 		return err
@@ -142,23 +145,21 @@ func startEdgeExtractor(mainConfigPath string) {
 	}
 	configureLogger(logDir, config.LogLevel)
 
-	err = config.Decrypt()
-	if err != nil {
-		log.Error("Failed to decrypt config file. Err:", err.Error())
-		return
-	}
-
 	log.Info("Starting edge-extractor service.")
 
-	cdfCLient := internal.NewCdfClient(config.ProjectName, config.CdfCluster, config.ClientID, config.Secret, config.Scopes, config.AdTenantId, config.AuthTokenUrl, config.CdfDatasetID)
+	secretManager := internal.NewSecretManager(EncryptionKey)
+	secretManager.LoadEncryptedSecrets(config.Secrets)
+	clientSecret := secretManager.GetSecret(config.Secret)
+	cdfCLient := internal.NewCdfClient(config.ProjectName, config.CdfCluster, config.ClientID, clientSecret, config.Scopes, config.AdTenantId, config.AuthTokenUrl, config.CdfDatasetID)
 
 	integrReg = make(map[string]Integration)
 
 	for _, integrName := range config.EnabledIntegrations {
 		switch integrName {
 		case "ip_cams_to_cdf":
-			intgr := integrations.NewCameraImagesToCdf(cdfCLient, config.ExtractorID, config.RemoteConfigSource)
-			intgr.SetLocalConfig(config.LocalIntegrationConfig)
+			intgr := cam_images_to_cdf.NewCameraImagesToCdf(cdfCLient, config.ExtractorID, config.RemoteConfigSource)
+			intgr.SetLocalConfig(config.LocalIntegrationConfig["ip_cams_to_cdf"].(cam_images_to_cdf.CameraImagesToCdfConfig))
+			intgr.SetSecretManager(secretManager)
 			err = intgr.Start()
 			if err != nil {
 				log.Errorf(" %s integration can't be started . Error : %s", integrName, err.Error())
@@ -166,8 +167,8 @@ func startEdgeExtractor(mainConfigPath string) {
 				integrReg["ip_cams_to_cdf"] = intgr
 			}
 		case "local_files_to_cdf":
-			intgr := integrations.NewLocalFilesToCdf(cdfCLient, config.ExtractorID, config.RemoteConfigSource)
-			intgr.SetLocalConfig(config.LocalIntegrationConfig)
+			intgr := local_files_to_cdf.NewLocalFilesToCdf(cdfCLient, config.ExtractorID, config.RemoteConfigSource)
+			// intgr.SetLocalConfig(config.LocalIntegrationConfig["local_files_to_cdf"].(integrations.LocalFilesToCdfConfig))
 			err = intgr.Start()
 			if err != nil {
 				log.Errorf(" %s integration can't be started . Error : %s", integrName, err.Error())
