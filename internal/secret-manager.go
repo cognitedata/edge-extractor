@@ -11,12 +11,20 @@ func NewSecretManager(key string) *SecretManager {
 	return &SecretManager{Key: key, Secrets: map[string]string{}}
 }
 
+// LoadEncryptedSecrets loads secrets in encrypted form from map[string]string, decrypts them and stores in internal secret store
 func (sm *SecretManager) LoadEncryptedSecrets(secrets map[string]string) error {
 	var err error
 	for k, v := range secrets {
 		sm.Secrets[k], err = DecryptString(sm.Key, v)
 	}
 	return err
+}
+
+// LoadSecrets loads secrets in plain text from map[string]string into internal secret store
+func (sm *SecretManager) LoadSecrets(secrets map[string]string) {
+	for k, v := range secrets {
+		sm.Secrets[k] = v
+	}
 }
 
 // returns secret either from internal secret store or from ENV variable if it is not found in the store.
@@ -33,10 +41,14 @@ func (sm *SecretManager) GetSecret(key string) string {
 	return secret
 }
 
-func (sm *SecretManager) GetEncryptedSecrets() map[string]string {
+func (sm *SecretManager) GetEncryptedSecrets() (map[string]string, error) {
 	encryptedSecrets := map[string]string{}
+	var err error
 	for k, v := range sm.Secrets {
-		encryptedSecrets[k], _ = EncryptString(sm.Key, v)
+		encryptedSecrets[k], err = EncryptString(sm.Key, v)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return encryptedSecrets
+	return encryptedSecrets, err
 }

@@ -1,10 +1,14 @@
 version="0.4.2"
 encryption_key=${CONFIG_ENCRYPTION_KEY}
+test_encryption_key=test_key_ZU8uJ8vxJs7Z75uF3Jy8m52
 set_private_repos :
 	go get github.com/cognitedata/cognite-sdk-go
 
 run :
-	go run cmd/main.go -config config.json
+	go run cmd/main.go --config config.json --key ${test_encryption_key}
+
+run-encrypt-config :
+	go run cmd/main.go --config config.json --key ${test_encryption_key} --op encrypt_config
 
 build : 
 	go build -o edge-extractor -ldflags="-X main.Version=${version} -X main.EncryptionKey=${encryption_key}" cmd/main.go

@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
-	"github.com/cognitedata/edge-extractor/integrations/cam_images_to_cdf"
-	"github.com/cognitedata/edge-extractor/integrations/local_files_to_cdf"
+	"github.com/cognitedata/edge-extractor/integrations/ip_cams_to_cdf"
 	"github.com/cognitedata/edge-extractor/internal"
 	"github.com/kardianos/service"
 	log "github.com/sirupsen/logrus"
@@ -49,6 +49,7 @@ func (p *program) Stop(s service.Service) error {
 	return nil
 }
 
+// Used
 func configureService() service.Service {
 	svcConfig := service.Config{Name: "cog-edge-extractor", DisplayName: "Cognite edge extractor", Description: "Cognite edge extractor service"}
 	var prg program
@@ -99,26 +100,24 @@ func encryptConfig(configPath string) error {
 	configBody, err := os.ReadFile(configPath)
 
 	if err != nil {
-		systemLog.Error("Failed to load config file. Err:", err.Error())
-		// TODO : Start config ui webserver here
+		fmt.Print("Failed to load config file. Err:", err.Error())
 		return err
 	}
 
 	err = json.Unmarshal(configBody, &config)
 	if err != nil {
-		systemLog.Error("Incorrect config file format. Err:", err.Error())
-		// TODO : Start config ui webserver here
+		fmt.Print("Incorrect config file format. Err:", err.Error())
 		return err
 	}
 	secretManager := internal.NewSecretManager(EncryptionKey)
-	secretManager.LoadEncryptedSecrets(config.Secrets)
-	config.Secrets = secretManager.GetEncryptedSecrets()
+	secretManager.LoadSecrets(config.Secrets)
+	config.Secrets, err = secretManager.GetEncryptedSecrets()
 	if err != nil {
-		systemLog.Error("Failed to encrypt config file. Err:", err.Error())
+		fmt.Print("Failed to encrypt config file. Err:", err)
 		return err
 	}
 	body, _ := json.MarshalIndent(&config, " ", "  ")
-	os.WriteFile("config.json", body, 0644)
+	os.WriteFile("config_encrypted.json", body, 0644)
 	return nil
 }
 
@@ -146,20 +145,29 @@ func startEdgeExtractor(mainConfigPath string) {
 	configureLogger(logDir, config.LogLevel)
 
 	log.Info("Starting edge-extractor service.")
-
 	secretManager := internal.NewSecretManager(EncryptionKey)
 	secretManager.LoadEncryptedSecrets(config.Secrets)
 	clientSecret := secretManager.GetSecret(config.Secret)
+	if clientSecret == "" {
+		log.Error("Client secret is not set. Please set it in config file or in environment variable")
+		return
+	}
 	cdfCLient := internal.NewCdfClient(config.ProjectName, config.CdfCluster, config.ClientID, clientSecret, config.Scopes, config.AdTenantId, config.AuthTokenUrl, config.CdfDatasetID)
+	configObserver := internal.NewCdfConfigObserver(config.ExtractorID, cdfCLient, config.RemoteConfigSource)
+	if config.RemoteConfigSource == internal.ConfigSourceExtPipelines {
+		configObserver.Start(config.ConfigReloadInterval * time.Second)
+	}
 
 	integrReg = make(map[string]Integration)
 
 	for _, integrName := range config.EnabledIntegrations {
 		switch integrName {
 		case "ip_cams_to_cdf":
-			intgr := cam_images_to_cdf.NewCameraImagesToCdf(cdfCLient, config.ExtractorID, config.RemoteConfigSource)
-			intgr.SetLocalConfig(config.LocalIntegrationConfig["ip_cams_to_cdf"].(cam_images_to_cdf.CameraImagesToCdfConfig))
+			intgr := ip_cams_to_cdf.NewCameraImagesToCdf(cdfCLient, config.ExtractorID, configObserver)
 			intgr.SetSecretManager(secretManager)
+			if config.RemoteConfigSource == internal.ConfigSourceLocal {
+				intgr.LoadConfigFromJson(config.LocalIntegrationConfig["ip_cams_to_cdf"])
+			}
 			err = intgr.Start()
 			if err != nil {
 				log.Errorf(" %s integration can't be started . Error : %s", integrName, err.Error())
@@ -167,14 +175,15 @@ func startEdgeExtractor(mainConfigPath string) {
 				integrReg["ip_cams_to_cdf"] = intgr
 			}
 		case "local_files_to_cdf":
-			intgr := local_files_to_cdf.NewLocalFilesToCdf(cdfCLient, config.ExtractorID, config.RemoteConfigSource)
-			// intgr.SetLocalConfig(config.LocalIntegrationConfig["local_files_to_cdf"].(integrations.LocalFilesToCdfConfig))
-			err = intgr.Start()
-			if err != nil {
-				log.Errorf(" %s integration can't be started . Error : %s", integrName, err.Error())
-			} else {
-				integrReg["local_files_to_cdf"] = intgr
-			}
+			log.Info(" local_files_to_cdf integration not implemented yet")
+			// intgr := local_files_to_cdf.NewLocalFilesToCdf(cdfCLient, config.ExtractorID, config.RemoteConfigSource)
+			// // intgr.SetLocalConfig(config.LocalIntegrationConfig["local_files_to_cdf"].(integrations.LocalFilesToCdfConfig))
+			// err = intgr.Start()
+			// if err != nil {
+			// 	log.Errorf(" %s integration can't be started . Error : %s", integrName, err.Error())
+			// } else {
+			// 	integrReg["local_files_to_cdf"] = intgr
+			// }
 
 		}
 	}
@@ -195,8 +204,14 @@ func main() {
 	base64encodedConfig := flag.String("bconfig", "", "Base64 encoded config")
 	op := flag.String("op", "", "Supported operations : 'gen_config,install,uninstall,run' ")
 	textToEncrypt := flag.String("secret", "", "Secret to encrypt")
-
+	encryptionKey := flag.String("key", "", "Encryption key")
 	flag.Parse()
+
+	if *encryptionKey != "" {
+		EncryptionKey = *encryptionKey
+	} else {
+		EncryptionKey = os.Getenv("EDGE_EXT_ENCRYPTION_KEY")
+	}
 
 	if *mainConfigPath == "config.json" {
 		*mainConfigPath = filepath.Join(internal.GetBinaryDir(), *mainConfigPath)

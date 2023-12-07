@@ -1,4 +1,4 @@
-package cam_images_to_cdf
+package ip_cams_to_cdf
 
 type CameraConfig struct {
 	ID              uint64
@@ -12,7 +12,6 @@ type CameraConfig struct {
 	PollingInterval int
 	State           string
 	LinkedAssetID   uint64
-	IsEncrypted     bool
 }
 
 // Compare CameraConfig with anothert CameraConfig
@@ -28,6 +27,27 @@ func (c *CameraConfig) IsEqual(other *CameraConfig) bool {
 		c.LinkedAssetID == other.LinkedAssetID
 }
 
-type CameraImagesToCdfConfig struct {
+type IntegrationConfig struct {
 	Cameras []CameraConfig
+}
+
+// Compare CameraImagesToCdfConfig with another CameraImagesToCdfConfig
+func (c *IntegrationConfig) IsEqual(other *IntegrationConfig) bool {
+	if len(c.Cameras) != len(other.Cameras) {
+		return false
+	}
+	for i, camera := range c.Cameras {
+		if !camera.IsEqual(&other.Cameras[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// clone returns a deep copy of IntegrationConfig
+func (c *IntegrationConfig) Clone() IntegrationConfig {
+	clone := IntegrationConfig{}
+	clone.Cameras = make([]CameraConfig, len(c.Cameras))
+	copy(clone.Cameras, c.Cameras)
+	return clone
 }

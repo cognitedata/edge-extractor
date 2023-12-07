@@ -5,32 +5,29 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core"
 	log "github.com/sirupsen/logrus"
 )
 
-type StartProcessor func(asset core.Asset) error
-type RestartProcessor func(asset core.Asset)
-type StartProcessorLoop func(asset core.Asset) error
-type StopProcessor func(procId uint64)
+// type StartProcessor func(asset core.Asset) error
+// type RestartProcessor func(asset core.Asset)
+// type StartProcessorLoop func(asset core.Asset) error
+// type StopProcessor func(procId uint64)
+
+type RemoteConfig map[string]json.RawMessage
 
 // const StartProcessorAction = 1
+const NewConfigAction = 1
 const RestartProcessorAction = 2
 const StopProcessorAction = 3
 const StartProcessorLoopAction = 4
 
-// CdfConfigObserver is a component that is responsible for monitoring filtererd subset of CDF Assets for changes , if change being detected it restarts or stops linked processor .
-// If observer detects that the asset is present remotely and not locally , it calls startProcessorLoop function
-// If observer detects that the asset is not present remotelyu is calls stopProcessor function
-// If observer detect that Asset name or external_id or metadata have been chagned,it calls restartProcessor function.
 type CdfConfigObserver struct {
 	extractorID        string
 	isStarted          bool
 	cogClient          *CdfClient
-	localAssetsList    core.AssetList
-	assetFilter        core.AssetFilter
-	configActionQueue  ConfigActionQueue
 	remoteConfigSource string // assets, ext_pipeline_config
+	configRegistry     map[string]interface{}
+	configUpdatesQueue map[string]ConfigActionQueue
 }
 
 type ConfigAction struct {
@@ -42,18 +39,21 @@ type ConfigAction struct {
 type ConfigActionQueue chan ConfigAction
 
 func NewCdfConfigObserver(extractorID string, cogClient *CdfClient, remoteConfigSource string) *CdfConfigObserver {
-	configActionQueue := make(chan ConfigAction, 5)
-	return &CdfConfigObserver{extractorID: extractorID, cogClient: cogClient, configActionQueue: configActionQueue, remoteConfigSource: remoteConfigSource}
+	return &CdfConfigObserver{extractorID: extractorID,
+		cogClient:          cogClient,
+		remoteConfigSource: remoteConfigSource,
+		configRegistry:     make(map[string]interface{}),
+		configUpdatesQueue: make(map[string]ConfigActionQueue),
+	}
 }
 
 // Start starts observer process using provided asset filter and reload interval. The operation is non-blocking
-func (intgr *CdfConfigObserver) Start(assetFilter core.AssetFilter, reloadInterval time.Duration) ConfigActionQueue {
+func (intgr *CdfConfigObserver) Start(reloadInterval time.Duration) {
 	log.Info("Starting CDF config observer, remote config source = ", intgr.remoteConfigSource)
 	if reloadInterval == 0 {
 		reloadInterval = 60 * time.Second
 	}
 	intgr.isStarted = true
-	intgr.assetFilter = assetFilter
 	go func() {
 		for {
 			err := intgr.reloadRemoteConfigs()
@@ -67,8 +67,18 @@ func (intgr *CdfConfigObserver) Start(assetFilter core.AssetFilter, reloadInterv
 		}
 		log.Info("CDF config loop has been terminated")
 	}()
-	return intgr.configActionQueue
 
+}
+
+// SubscribeToConfigUpdates registers Integration in config observer and returns config action queue that Integration can use to receive config updates
+// The queue has capacity of 5 items. If queue is full , the oldest item will be dropped. This is done to avoid blocking of config observer
+// Config events aren't filtered and it's responsibility of Integration to do change detection
+// name - name of Integration
+// config - pointer to Integration config struct
+func (intgr *CdfConfigObserver) SubscribeToConfigUpdates(name string, config interface{}) ConfigActionQueue {
+	intgr.configRegistry[name] = config
+	intgr.configUpdatesQueue[name] = make(ConfigActionQueue, 5)
+	return intgr.configUpdatesQueue[name]
 }
 
 func (intgr *CdfConfigObserver) Stop() {
@@ -76,7 +86,7 @@ func (intgr *CdfConfigObserver) Stop() {
 	intgr.isStarted = false
 }
 
-// reloadRemoteConfigs loads relote configuration from CDF , compares with local state and run actions (start/stop/restart) to match local state to target state .
+// reloadRemoteConfigs loads config , sends config updates to all processors via config action queue
 func (intgr *CdfConfigObserver) reloadRemoteConfigs() error {
 	defer func() {
 		if r := recover(); r != nil {
@@ -87,20 +97,33 @@ func (intgr *CdfConfigObserver) reloadRemoteConfigs() error {
 
 	log.Debug("Reloading remote config")
 
-	if intgr.remoteConfigSource == "assets" {
-		remoteAssetList, err := intgr.cogClient.Client().Assets.Filter(intgr.assetFilter, 1000)
-		if err != nil {
-			return err
-		}
-	} else if intgr.remoteConfigSource == "ext_pipeline_config" {
+	if intgr.remoteConfigSource == "ext_pipeline_config" {
 		remoteConfig, err := intgr.cogClient.Client().ExtractionPipelines.GetRemoteConfig(intgr.extractorID)
 		if err != nil {
 			return err
 		}
-
-		err = json.Unmarshal([]byte(remoteConfig.Config), &remoteAssetList)
+		var remoteIntegrationsConfig RemoteConfig
+		err = json.Unmarshal([]byte(remoteConfig.Config), &remoteIntegrationsConfig)
 		if err != nil {
+			log.Error("Failed to unmarshal remote config with error : ", err)
 			return err
+		}
+		for integrationNameFromRemote, v := range remoteIntegrationsConfig {
+			if _, ok := intgr.configRegistry[integrationNameFromRemote]; ok {
+				integrConfig := intgr.configRegistry[integrationNameFromRemote]
+				err = json.Unmarshal(v, integrConfig)
+				if err != nil {
+					log.Errorf("Failed to unmarshal remote config for processor %s with error : %s", integrationNameFromRemote, err)
+				}
+
+				select {
+				case intgr.configUpdatesQueue[integrationNameFromRemote] <- ConfigAction{Name: NewConfigAction, Config: integrConfig}:
+				default:
+					log.Warnf("Config action queue for processor %s is full", integrationNameFromRemote)
+				}
+			} else {
+				log.Errorf("Processor %s is not registered in config registry", integrationNameFromRemote)
+			}
 		}
 
 	} else {
@@ -115,59 +138,7 @@ func (intgr *CdfConfigObserver) reloadRemoteConfigs() error {
 	// 3. asset present in both lists but metadata is defferent - asset has been updated . Action reload processor
 	// 4. assets are equal - Do nothing
 
-	log.Debug("Number of assets from CDF =", len(remoteAssetList))
-
-	var updatedRemoteAsset core.Asset
-	var isUpdated bool
-
-	for i := range intgr.localAssetsList {
-		isEqual := false
-		isPresentRemotely := false
-		for i2 := range remoteAssetList {
-			if intgr.localAssetsList[i].ID == remoteAssetList[i2].ID {
-				isPresentRemotely = true
-				if intgr.cogClient.CompareAssets(intgr.localAssetsList[i], remoteAssetList[i2]) {
-					isEqual = true
-				} else {
-					updatedRemoteAsset = remoteAssetList[i2]
-				}
-				break
-			}
-		}
-
-		if !isPresentRemotely {
-			log.Infof("Remote change detected. Removing processor %d ", intgr.localAssetsList[i].ID)
-			isUpdated = true
-			intgr.configActionQueue <- ConfigAction{Name: StopProcessorAction, ProcId: intgr.localAssetsList[i].ID}
-
-		} else if isPresentRemotely && !isEqual {
-			log.Infof("Remote change detected. Restarting and updating processor %d", intgr.localAssetsList[i].ID)
-			// Reload processor
-			isUpdated = true
-			intgr.configActionQueue <- ConfigAction{Name: RestartProcessorAction, Asset: updatedRemoteAsset}
-		}
-	}
-
-	// Comparing remote assets with local , starting processors for all new remote assets
-	for i3 := range remoteAssetList {
-		isPresent := false
-		for i4 := range intgr.localAssetsList {
-			if intgr.localAssetsList[i4].ID == remoteAssetList[i3].ID {
-				isPresent = true
-				break
-			}
-		}
-		if !isPresent {
-			isUpdated = true
-			log.Infof("Remote change detected. Starting new processor %d for camera %s", remoteAssetList[i3].ID, remoteAssetList[i3].Name)
-			// The service starts separate processor for each camera.
-			intgr.configActionQueue <- ConfigAction{Name: StartProcessorLoopAction, Asset: remoteAssetList[i3]}
-		}
-
-	}
-	if isUpdated {
-		intgr.localAssetsList = remoteAssetList
-	}
+	// intgr.configActionQueue <- ConfigAction{Name: RestartProcessorAction, Asset: updatedRemoteAsset}
 
 	return nil
 }

@@ -63,7 +63,7 @@ func (co *CdfClient) UploadFile(filePath, externalId, name, mimeType string, ass
 
 func (co *CdfClient) UploadInMemoryFile(body []byte, externalId, name, mimeType string, assetId uint64) error {
 
-	fileMetadata := core.CreateFileMetadata{ExternalId: externalId, Name: name, MimeType: mimeType, DataSetId: co.dataSetId}
+	fileMetadata := core.CreateFileMetadata{ExternalId: externalId, Name: name, MimeType: mimeType, DataSetId: co.dataSetId, Source: "edge-extractor"}
 	if assetId != 0 {
 		fileMetadata.AssetIds = []uint64{assetId}
 	}
@@ -240,5 +240,3 @@ func (co *CdfClient) CompareAssets(asset1, asset2 core.Asset) bool {
 	return true
 
 }
-
-
