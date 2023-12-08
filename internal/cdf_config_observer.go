@@ -28,6 +28,7 @@ type CdfConfigObserver struct {
 	remoteConfigSource string // assets, ext_pipeline_config
 	configRegistry     map[string]interface{}
 	configUpdatesQueue map[string]ConfigActionQueue
+	secretManager      *SecretManager
 }
 
 type ConfigAction struct {
@@ -38,12 +39,13 @@ type ConfigAction struct {
 
 type ConfigActionQueue chan ConfigAction
 
-func NewCdfConfigObserver(extractorID string, cogClient *CdfClient, remoteConfigSource string) *CdfConfigObserver {
+func NewCdfConfigObserver(extractorID string, cogClient *CdfClient, remoteConfigSource string, secretManager *SecretManager) *CdfConfigObserver {
 	return &CdfConfigObserver{extractorID: extractorID,
 		cogClient:          cogClient,
 		remoteConfigSource: remoteConfigSource,
 		configRegistry:     make(map[string]interface{}),
 		configUpdatesQueue: make(map[string]ConfigActionQueue),
+		secretManager:      secretManager,
 	}
 }
 
@@ -102,13 +104,20 @@ func (intgr *CdfConfigObserver) reloadRemoteConfigs() error {
 		if err != nil {
 			return err
 		}
-		var remoteIntegrationsConfig RemoteConfig
+		// Loading full static config from remote API. The config only expected to have integrations section and secrets section
+		var remoteIntegrationsConfig StaticConfig
 		err = json.Unmarshal([]byte(remoteConfig.Config), &remoteIntegrationsConfig)
 		if err != nil {
 			log.Error("Failed to unmarshal remote config with error : ", err)
 			return err
 		}
-		for integrationNameFromRemote, v := range remoteIntegrationsConfig {
+
+		err = intgr.secretManager.LoadEncryptedSecrets(remoteIntegrationsConfig.Secrets)
+		if err != nil {
+			log.Error("Failed to load secrets with error : ", err)
+		}
+
+		for integrationNameFromRemote, v := range remoteIntegrationsConfig.Integrations {
 			if _, ok := intgr.configRegistry[integrationNameFromRemote]; ok {
 				integrConfig := intgr.configRegistry[integrationNameFromRemote]
 				err = json.Unmarshal(v, integrConfig)

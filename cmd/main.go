@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/cognitedata/edge-extractor/integrations/ip_cams_to_cdf"
@@ -49,7 +50,7 @@ func (p *program) Stop(s service.Service) error {
 	return nil
 }
 
-// Used
+// configureService configures the edge extractor as OS service. Applicable when running on Windows or Linux as service.
 func configureService() service.Service {
 	svcConfig := service.Config{Name: "cog-edge-extractor", DisplayName: "Cognite edge extractor", Description: "Cognite edge extractor service"}
 	var prg program
@@ -95,7 +96,7 @@ func configureLogger(logPath, level string) {
 
 }
 
-func encryptConfig(configPath string) error {
+func encryptSecretsInConfig(configPath string) error {
 	var config internal.StaticConfig
 	configBody, err := os.ReadFile(configPath)
 
@@ -116,26 +117,62 @@ func encryptConfig(configPath string) error {
 		fmt.Print("Failed to encrypt config file. Err:", err)
 		return err
 	}
+	config.IsEncrypted = true
 	body, _ := json.MarshalIndent(&config, " ", "  ")
 	os.WriteFile("config_encrypted.json", body, 0644)
 	return nil
 }
 
+func loadStaticConfigFromEnv() internal.StaticConfig {
+	var config internal.StaticConfig
+	var err error
+	config.ProjectName = os.Getenv("EDGE_EXT_CDF_PROJECT")
+	config.CdfCluster = os.Getenv("EDGE_EXT_CDF_CLUSTER")
+	config.Scopes = []string{os.Getenv("EDGE_EXT_CDF_SCOPES")}
+	config.AuthTokenUrl = os.Getenv("EDGE_EXT_CDF_AUTH_TOKEN_URL")
+	config.ClientID = os.Getenv("EDGE_EXT_CDF_CLIENT_ID")
+	config.Secret = os.Getenv("EDGE_EXT_CDF_CLIENT_SECRET")
+	config.AdTenantId = os.Getenv("EDGE_EXT_CDF_AD_TENANT_ID")
+	config.CdfDatasetID, err = strconv.Atoi(os.Getenv("EDGE_EXT_CDF_DATASET_ID"))
+	if err != nil {
+		log.Error("Failed to parse CDF dataset ID. Err:", err.Error())
+	}
+	config.ExtractorID = os.Getenv("EDGE_EXT_EXTRACTOR_ID")
+	config.RemoteConfigSource = os.Getenv("EDGE_EXT_CONFIG_SOURCE")
+
+	configReloadInterval, err := strconv.Atoi(os.Getenv("EDGE_EXT_CONFIG_RELOAD_INTERVAL"))
+	if err != nil {
+		log.Error("Failed to parse config reload interval. Err:", err.Error())
+		configReloadInterval = 60
+	}
+	config.ConfigReloadInterval = time.Duration(configReloadInterval)
+	config.EnabledIntegrations = []string{os.Getenv("EDGE_EXT_ENABLED_INTEGRATIONS")}
+	config.LogLevel = os.Getenv("EDGE_EXT_LOG_LEVEL")
+	config.LogDir = os.Getenv("EDGE_EXT_LOG_DIR")
+	return config
+}
+
 func startEdgeExtractor(mainConfigPath string) {
 	var config internal.StaticConfig
-	configBody, err := os.ReadFile(mainConfigPath)
+	var err error
+	if os.Getenv("EDGE_EXT_CDF_PROJECT") != "" {
+		log.Info("Loading configuration from ENV variables ")
+		config = loadStaticConfigFromEnv()
+	} else {
+		log.Info("Loading configuration from file ", mainConfigPath)
+		configBody, err := os.ReadFile(mainConfigPath)
+		if err != nil {
+			systemLog.Error("Failed to load config file. Err:", err.Error())
+			// TODO : Start config ui webserver here
+			return
+		}
 
-	if err != nil {
-		systemLog.Error("Failed to load config file. Err:", err.Error())
-		// TODO : Start config ui webserver here
-		return
-	}
-
-	err = json.Unmarshal(configBody, &config)
-	if err != nil {
-		systemLog.Error("Incorrect config file format. Err:", err.Error())
-		// TODO : Start config ui webserver here
-		return
+		err = json.Unmarshal(configBody, &config)
+		if err != nil {
+			systemLog.Error("Incorrect config file format. Err:", err.Error())
+			// TODO : Start config ui webserver here
+			return
+		}
 	}
 
 	logDir := internal.GetBinaryDir()
@@ -153,7 +190,7 @@ func startEdgeExtractor(mainConfigPath string) {
 		return
 	}
 	cdfCLient := internal.NewCdfClient(config.ProjectName, config.CdfCluster, config.ClientID, clientSecret, config.Scopes, config.AdTenantId, config.AuthTokenUrl, config.CdfDatasetID)
-	configObserver := internal.NewCdfConfigObserver(config.ExtractorID, cdfCLient, config.RemoteConfigSource)
+	configObserver := internal.NewCdfConfigObserver(config.ExtractorID, cdfCLient, config.RemoteConfigSource, secretManager)
 	if config.RemoteConfigSource == internal.ConfigSourceExtPipelines {
 		configObserver.Start(config.ConfigReloadInterval * time.Second)
 	}
@@ -166,7 +203,7 @@ func startEdgeExtractor(mainConfigPath string) {
 			intgr := ip_cams_to_cdf.NewCameraImagesToCdf(cdfCLient, config.ExtractorID, configObserver)
 			intgr.SetSecretManager(secretManager)
 			if config.RemoteConfigSource == internal.ConfigSourceLocal {
-				intgr.LoadConfigFromJson(config.LocalIntegrationConfig["ip_cams_to_cdf"])
+				intgr.LoadConfigFromJson(config.Integrations["ip_cams_to_cdf"])
 			}
 			err = intgr.Start()
 			if err != nil {
@@ -198,7 +235,9 @@ func stopExtractor() {
 func main() {
 
 	log.Infof("----- Starting edge-extractor - version = %s ----------", Version)
-
+	// print working directory
+	dir, _ := os.Getwd()
+	log.Debug("Working directory : ", dir)
 	mainConfigPath := flag.String("config", "config.json", "Full path to main configuration file")
 
 	base64encodedConfig := flag.String("bconfig", "", "Base64 encoded config")
@@ -215,6 +254,8 @@ func main() {
 
 	if *mainConfigPath == "config.json" {
 		*mainConfigPath = filepath.Join(internal.GetBinaryDir(), *mainConfigPath)
+		fullConfigPath = *mainConfigPath
+	} else {
 		fullConfigPath = *mainConfigPath
 	}
 
@@ -258,7 +299,7 @@ func main() {
 			return
 		}
 
-		err := encryptConfig(*mainConfigPath)
+		err := encryptSecretsInConfig(*mainConfigPath)
 		if err != nil {
 			fmt.Println("Failed to encrypt config file. Err:", err.Error())
 		}

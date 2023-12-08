@@ -26,9 +26,9 @@ type StaticConfig struct {
 	LogLevel             string
 	LogDir               string
 
-	LocalIntegrationConfig map[string]json.RawMessage // map of integration configs (key is integration name, value is integration config)
-	IsEncrypted            bool
-	Secrets                map[string]string // map of encrypted secrets (key is secret name, value is encrypted secret)
+	Integrations map[string]json.RawMessage // map of integration configs (key is integration name, value is integration config)
+	IsEncrypted  bool
+	Secrets      map[string]string // map of encrypted secrets (key is secret name, value is encrypted secret)
 }
 
 func (config *StaticConfig) EncryptSecrets(key string) error {
