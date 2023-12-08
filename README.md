@@ -55,10 +55,10 @@ Parameter | ENV_VAR | Description | Example
 `ExtractorID` | EDGE_EXT_EXTRACTOR_ID | Unique ID of the extractor | `edge-extractor-dev-1`
 `ProjectName` | EDGE_EXT_CDF_PROJECT_NAME | Name of the CDF project | `my-project`
 `CdfCluster` | EDGE_EXT_CDF_CLUSTER | Name of the CDF cluster | `westeurope-1`
-`AdTenantId` | EDGE_EXT_AD_TENANT_ID | Azure AD tenant ID | `176a22cf-3d72-4b07-a4f8-0841557a570c`
-`AuthTokenUrl` | EDGE_EXT_AD_AUTH_TOKEN_URL | Azure AD token endpoint URL | `https://login.microsoftonline.com/176a22cf-3d72-4b07-a4f8-0841557a570c/oauth2/v2.0/token`
-`ClientID` | EDGE_EXT_AD_CLIENT_ID | Azure AD client ID | `176a22cf-3d72-4b07-a4f8-0841557a570c`
-`Secret` | EDGE_EXT_AD_SECRET | Azure AD client secret | `176a22cf-3d72-4b07-a4f8-0841557a570c`
+`AdTenantId` | EDGE_EXT_AD_TENANT_ID | Azure AD tenant ID | `example-tenant-4b07-a4f8-0841557a570c`
+`AuthTokenUrl` | EDGE_EXT_AD_AUTH_TOKEN_URL | Azure AD token endpoint URL | `https://login.microsoftonline.com/example-tenant-4b07-a4f8-0841557a570c/oauth2/v2.0/token`
+`ClientID` | EDGE_EXT_AD_CLIENT_ID | Azure AD client ID | `example-3d72-4b07-a4f8-0841557a570c`
+`Secret` | EDGE_EXT_AD_SECRET | Azure AD client secret | `example-secret`
 `Scopes` | EDGE_EX_AD_SCOPES | Azure AD scopes | `https://westeurope-1.cognitedata.com/.default`
 `CdfDatasetID` | EDGE_EXT_CDF_DATASET_ID | CDF dataset ID | `866030833773755`
 `EnabledIntegrations` | EDGE_EXT_ENABLED_INTEGRATIONS | List of enabled integrations | `ip_cams_to_cdf`
