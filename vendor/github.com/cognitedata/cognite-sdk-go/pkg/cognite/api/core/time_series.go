@@ -245,6 +245,22 @@ func (timeSeriesManager *TimeSeries) InsertDatapoints(datapoints dto.DatapointLi
 	return nil
 }
 
+// InsertDatapoints inserts datapoints
+func (timeSeriesManager *TimeSeries) InsertDatapointsExt(datapoints dto.DatapointList, timeSerieIDExt string) error {
+	createDatapoints := datapoints.ConvertToCreateDatapointsExt(timeSerieIDExt)
+	jsonBytes, err := json.Marshal(createDatapoints)
+	if err != nil {
+		return errors.Wrap(err, "Unable to marshal struct in InsertDatapoints() TimeSeries")
+	}
+
+	_, err = timeSeriesManager.apiClient.Post("timeseries/data", jsonBytes)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // RetrieveDatapoints retrieves datapoints
 func (timeSeriesManager *TimeSeries) RetrieveDatapoints(datapointsFilter dto.DatapointsFilter) (dto.DatapointList, error) {
 	jsonBytes, err := json.Marshal(datapointsFilter)

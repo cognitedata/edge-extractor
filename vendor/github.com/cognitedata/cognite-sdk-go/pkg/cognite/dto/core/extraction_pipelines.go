@@ -18,3 +18,11 @@ type CreateExtractonRunsList []CreateExtractionRun
 type CreateExtractonRuns struct {
 	Items CreateExtractonRunsList `json:"items"`
 }
+
+type ConfigRessponse struct {
+    ExternalId   string `json:"externalId"`
+    Config       string `json:"config"`
+    Revision     int    `json:"revision"`
+    CreatedTime  int64  `json:"createdTime"`
+    Description  string `json:"description"`
+}

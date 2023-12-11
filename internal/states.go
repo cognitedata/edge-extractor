@@ -10,6 +10,7 @@ const (
 	ProcessorStateStarting = "STARTING"
 	ProcessorStateShutdown = "SHUTDOWN"
 	ProcessorStateStopped  = "STOPPED"
+	ProcessorStateNotFound = "NOT_FOUND"
 )
 
 type ProcessorState struct {
@@ -32,7 +33,7 @@ func (intgr *StateTracker) SetProcessorTargetState(procId uint64, state string) 
 	intgr.mux.Lock()
 	defer intgr.mux.Unlock()
 	st := intgr.getProcessorState(procId)
-	if st == nil {
+	if st.CurrentState == ProcessorStateNotFound {
 		intgr.procStates = append(intgr.procStates, ProcessorState{ID: procId, TargetState: state})
 	} else {
 		st.TargetState = state
@@ -43,7 +44,7 @@ func (intgr *StateTracker) SetProcessorCurrentState(procId uint64, state string)
 	intgr.mux.Lock()
 	defer intgr.mux.Unlock()
 	st := intgr.getProcessorState(procId)
-	if st == nil {
+	if st.CurrentState == ProcessorStateNotFound {
 		intgr.procStates = append(intgr.procStates, ProcessorState{ID: procId, CurrentState: state})
 	} else {
 		st.CurrentState = state
@@ -57,7 +58,7 @@ func (intgr *StateTracker) getProcessorState(procId uint64) *ProcessorState {
 			return &intgr.procStates[i]
 		}
 	}
-	return nil
+	return &ProcessorState{ID: procId, CurrentState: ProcessorStateNotFound, TargetState: ProcessorStateNotFound}
 }
 
 // GetProcessorState public version of getProcessorState

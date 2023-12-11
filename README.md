@@ -27,37 +27,69 @@ Integration process
 
 - CDF output 
 
-### Integration processes 
-
-- Camera to CDF . The process loads configurations from CDF asset -> requests images from each IP camera -> uploads images to CDF Files and link them to camera asset
-- Local storage file to CDF. The process loads images from SD a card or different local storage, uploads images to CDF Files, and links them to camera assets.
-
-All processes support parallel data retrieval from multiple devices. 
-
 ### Device drivers 
 
-Supported camera drives : 
+Supported camera drivers : 
 
-- Axis 
-- Hikvision 
-- Reolink 
-- File system. 
-- Generic URL camera 
-- Fliw Ax8
-- Dahua
+- Axis - `axis`  
+- Hikvision - `hikvision`
+- Reolink - `reolink`
+- File system - `fscam`
+- Generic URL camera - `urlcam`
+- Flir Ax8 - `flir_ax8`
+- Dahua - `dahua`
 
-### Implemented integrations 
-
-- ip_cams_to_cdf 
-- local_files_to_cdf
 
 ### Configurations
 
 The service is using 2 types of configurations : 
 1. Static - loaded durign service startup . 
-2. Dynamic - loaded from remote endpoint , for instance from Asset metadata. 
+2. Dynamic - loaded from remote endpoint (CDF) during service startup and periodically updated. Supported remote sources : CDF Extraction pipelines configs.
 
-### Service CLI parameter 
+#### Static configuration
+
+Static configuration is loaded from local config file (JSON) and contains information about CDF project , CDF cluster , CDF dataset , CDF authentication , etc.
+
+Parameter | ENV_VAR | Description | Example
+--- | --- | --- | ---
+`ExtractorID` | EDGE_EXT_EXTRACTOR_ID | Unique ID of the extractor | `edge-extractor-dev-1`
+`ProjectName` | EDGE_EXT_CDF_PROJECT_NAME | Name of the CDF project | `my-project`
+`CdfCluster` | EDGE_EXT_CDF_CLUSTER | Name of the CDF cluster | `westeurope-1`
+`AdTenantId` | EDGE_EXT_AD_TENANT_ID | Azure AD tenant ID | `example-tenant-4b07-a4f8-0841557a570c`
+`AuthTokenUrl` | EDGE_EXT_AD_AUTH_TOKEN_URL | Azure AD token endpoint URL | `https://login.microsoftonline.com/example-tenant-4b07-a4f8-0841557a570c/oauth2/v2.0/token`
+`ClientID` | EDGE_EXT_AD_CLIENT_ID | Azure AD client ID | `example-3d72-4b07-a4f8-0841557a570c`
+`Secret` | EDGE_EXT_AD_SECRET | Azure AD client secret | `example-secret`
+`Scopes` | EDGE_EX_AD_SCOPES | Azure AD scopes | `https://westeurope-1.cognitedata.com/.default`
+`CdfDatasetID` | EDGE_EXT_CDF_DATASET_ID | CDF dataset ID | `866030833773755`
+`EnabledIntegrations` | EDGE_EXT_ENABLED_INTEGRATIONS | List of enabled integrations | `ip_cams_to_cdf`
+`LogLevel` | EDGE_EXT_LOG_LEVEL | Log level | `debug`
+`IsEncrypted` | EDGE_EXT_IS_ENCRYPTED | Is config encrypted (true/false) | `false`
+`Secrets` |  | Map of secrets | `{"cdf_client_secret":"_encrypted_secret_"}`
+`Integrations` |  | Collection of integration specific configurations | `{"ip_cams_to_cdf":{...}}`
+
+
+### Integrations 
+
+#### ip_cams_to_cdf 
+The process connects to each IP camera , fetches images using camera specific API and uploads images to CDF Files and optionally links them to camera asset.
+The processes supports parallel data retrieval from multiple devices. 
+
+Configurations : 
+
+Parameter | Description | Example
+--- | --- | ---
+`Name` | Name of the camera | `camera-1`
+`Id` | ID of Asset that repsents camera . All images are linked to that Asset if configured | 403447394704254
+`Model` | Camera model (from the list of supported camera drivers) | `axis`
+`Address` | Camera endpoint URI | `http://10.22.15.62` , `rtsp://` , `./imgdump`
+`PollingInterval` | Polling interval in seconds | 10
+`Username` | Username | `admin`
+`Password` | Password. It can be either plain text value of key that must exist in Secrets section of config or ENV variable. | `admin`
+`State` | State of the camera (enabled/disabled) | `enabled`
+
+
+
+### Service CLI parameters
 
 `--op` - operation , supported operations : 
    - `run` - rund the service in command line 
@@ -98,72 +130,158 @@ Examples :
 
 ### Config file 
 
-Minimal local config , all cameras configured remotely.
+Minimal local config for remotely configured cameras.
+
+Content of `config.json` file :
 
 ````
 {
-    "ExtractorID":"edge-extractor-dev-1",
-    "ProjectName": "_set_your_project_name_here",
-    "CdfCluster": "westeurope-1",
-    "AdTenantId": "176a22cf-3d72-4b07-a4f8-0841557a570c",
-    "AuthTokenUrl": "https://login.microsoftonline.com/176a22cf-3d72-4b07-a4f8-0841557a570c/oauth2/v2.0/token",
-    "ClientID": "_set_your_client_id_here_",
-    "Secret": "_set_your_client_secret_here_",
-    "Scopes": [
-      "https://westeurope-1.cognitedata.com/.default"
-    ],
-    "CdfDatasetID": 866030833773755,
-    "EnabledIntegrations": [
-      "ip_cams_to_cdf"
-    ],
-    "LogLevel":"debug",
-    "LogDir":"-",  
-  }
+   "ProjectName": "_cdf_project_name_",
+   "CdfCluster": "_cdf_cluster_name_",
+   "AdTenantId": "_azure_ad_tenant_id_",
+   "AuthTokenUrl": "https://login.microsoftonline.com/_azure_ad_tenant_id_/oauth2/v2.0/token",
+   "ClientID": "_service_principal_client_id_",
+   "Secret": "cdf_client_secret",
+   "Scopes": [
+     "https://az-power-no-northeurope.cognitedata.com/.default"
+   ],
+   "CdfDatasetID": 2626756768281823,
+   "ExtractorID": "edge-extractor-1",
+   "RemoteConfigSource": "ext_pipeline_config",
+   "ConfigReloadInterval": 0,
+   "EnabledIntegrations": [
+     "ip_cams_to_cdf"
+   ],
+   "LogLevel": "debug",
+   "LogDir": "-",
+   "IsEncrypted": true,
+   "Secrets": {
+     "cdf_client_secret": "_encrypted_secret_",
+   }
+ }
 ````
-Local config , all configurations loaded from local config files.
+Content of remote configuration (CDF extraction pipeline config) :
+
+```
+{
+"Integrations":{
+     "ip_cams_to_cdf": {
+       "Cameras": [
+         {
+           "ID": 1,
+           "Name": "Camera 1",
+           "Model": "fscam",
+           "Address": "./test/data/imgdump",
+           "Username": "root",
+           "Password": "camera_1_password",
+           "Mode": "camera",
+           "PollingInterval": 15,
+           "State": "enabled"
+         },
+         {
+           "ID": 2,
+           "Name": "URL virtual camera",
+           "Model": "urlcam",
+           "Address": "https://media.istockphoto.com/id/1496920323/photo/thinking-robot.jpg?s=612x612&w=0&k=20&c=heLdpKSUvt0w7dtm5IXmu4JJ5GvPvdpcywrqcL78P9s=",
+           "Username": "",
+           "Password": "",
+           "Mode": "camera",
+           "PollingInterval": 15,
+           "State": "disabled"
+         }
+       ]
+     }
+},
+"Secrets":{}
+}
+
+```
+
+Local config with locally configured cameras.
 
 ````
 {
-    "ExtractorID":"edge-extractor-dev-1",
-    "ProjectName": "_set_your_project_name_here",
-    "CdfCluster": "westeurope-1",
-    "AdTenantId": "176a22cf-3d72-4b07-a4f8-0841557a570c",
-    "AuthTokenUrl": "https://login.microsoftonline.com/176a22cf-3d72-4b07-a4f8-0841557a570c/oauth2/v2.0/token",
-    "ClientID": "_set_your_client_id_here_",
-    "Secret": "_set_your_client_secret_here_",
-    "Scopes": [
-      "https://westeurope-1.cognitedata.com/.default"
-    ],
-    "CdfDatasetID": 866030833773755,
-    "EnabledIntegrations": [
-      "local_files_to_cdf"
-    ],
-    "LogLevel":"debug",
-    "LogDir":"-",
-    "IsEncrypted": false,
-    "LocalIntegrationConfig": [{
-      "id":403447394704254,
-      "name":"local_uploader",
-      "metadata": {
-        "cog_model":"fscam",
-        "uri":"./imgdump",
-        "polling_interval":"0",
-        "max_parallel_runs":"3"
-      }
-      
-    }]
-  }
+   "ProjectName": "_cdf_project_name_",
+   "CdfCluster": "_cdf_cluster_name_",
+   "AdTenantId": "_azure_ad_tenant_id_",
+   "AuthTokenUrl": "https://login.microsoftonline.com/_azure_ad_tenant_id_/oauth2/v2.0/token",
+   "ClientID": "_service_principal_client_id_",
+   "Secret": "cdf_client_secret",
+   "Scopes": [
+     "https://az-power-no-northeurope.cognitedata.com/.default"
+   ],
+   "CdfDatasetID": 2626756768281823,
+   "ExtractorID": "edge-extractor-1",
+   "RemoteConfigSource": "local",
+   "ConfigReloadInterval": 0,
+   "EnabledIntegrations": [
+     "ip_cams_to_cdf"
+   ],
+   "LogLevel": "debug",
+   "LogDir": "-",
+   "IsEncrypted": true,
+   "Integrations":{
+    "ip_cams_to_cdf": {
+      "Cameras": [
+        {
+          "ID": 1,
+          "Name": "Camera 1",
+          "Model": "fscam",
+          "Address": "./test/data/imgdump",
+          "Username": "root",
+          "Password": "camera_1_password",
+          "Mode": "camera",
+          "PollingInterval": 15,
+          "State": "enabled"
+        },
+        {
+          "ID": 2,
+          "Name": "URL virtual camera",
+          "Model": "urlcam",
+          "Address": "https://media.istockphoto.com/id/1496920323/photo/thinking-robot.jpg?s=612x612&w=0&k=20&c=heLdpKSUvt0w7dtm5IXmu4JJ5GvPvdpcywrqcL78P9s=",
+          "Username": "",
+          "Password": "",
+          "Mode": "camera",
+          "PollingInterval": 15,
+          "State": "disabled"
+        }
+      ]
+    }
+ },
+   "Secrets": {
+     "cdf_client_secret": "_encrypted_secret_",
+   }
+ }
 ````
 
-By default Secret and all password fields (in camera config section) are stored in plain text , to make it more secure the extractor also supports encrypted mode.
-To encrypt the config file run `edge-extractor --op encrypt_config` command , this will encrypt Secret and all password fields in config file and encrypted version
-will be saved to the same configuration file. Create a copy of unencrypted config file before running the command. 
+### Secret management
+
+The service support 3 ways of storing secrets :
+- In plain text in config file
+- In encrypted form in config file (In this case `IsEncrypted` parameter must be set to `true` and `Secrets` section must be present in config file)
+- In environment variables
+
+Encryption and decryption is done using AES-256 algorithm with 32 bytes long key. The key is set during build time but can be changed by setting `EDGE_EXT_SECRET_KEY` environment variable.
+
+The service also can fetch secrets from environment variables. The name of the environment variable must match the name of the secret in config file. Example : a secret can be set as environment variable `CDF_CLIENT_SECRET` and the service will fetch the value from environment variable , in config file it should be referenced  `"Secret": "cdf_client_secret"` or `"Password": "CDF_CLIENT_SECRET"`
 
 
-### Extractor monitoring 
+The service provides convenient way to encrypt all secrets in config file using CLI command `edge-extractor --op encrypt_config`. The command will generate new config file with encrypted secrets and save it to `config_encrypted.json` file.
+
+Another command can be used to encrypt one secret `edge-extractor --op encrypt_secret --secret <secret_value>` and output encrypted value to stdout.
+
+### Extractor monitoring and remote configuration
 
 The extractor can be monitored remotely via CDF extraction pipelines. Exraction pipelines must be created in CDF upfront (via CDF Fusion or using SDK) and 
 extractor pipeline ExternalID must match `ExtractorID` in config above.
+
+Remote configuration using CDF Fusion UI :
+
+![Remote config](/docs/remote-config.png)
+
+Remote monitoring using CDF Fusion UI :
+
+![Remote monitoring](/docs/remote-monitoring.png)
 
 More information about CDF extraction pipelines can be found [here](https://docs.cognite.com/cdf/integration/guides/interfaces/monitor_integrations/) 
 
