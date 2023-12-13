@@ -1,4 +1,4 @@
-version="0.5.0"
+version="0.5.1"
 encryption_key=${CONFIG_ENCRYPTION_KEY}
 test_encryption_key=test_key_ZU8uJ8vxJs7Z75uF3Jy8m52
 set_private_repos :

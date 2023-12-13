@@ -248,7 +248,7 @@ func main() {
 
 	if *encryptionKey != "" {
 		EncryptionKey = *encryptionKey
-	} else {
+	} else if os.Getenv("EDGE_EXT_ENCRYPTION_KEY") != "" {
 		EncryptionKey = os.Getenv("EDGE_EXT_ENCRYPTION_KEY")
 	}
 
