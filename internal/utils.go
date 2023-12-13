@@ -93,13 +93,13 @@ func DecryptString(key, text string) (string, error) {
 	//Create a new Cipher Block from the key
 	block, err := aes.NewCipher(keyBytes)
 	if err != nil {
-		panic(err.Error())
+		return "", err
 	}
 
 	//Create a new GCM
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
-		panic(err.Error())
+		return "", err
 	}
 
 	//Get the nonce size
@@ -111,7 +111,7 @@ func DecryptString(key, text string) (string, error) {
 	//Decrypt the data
 	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		panic(err.Error())
+		return "", err
 	}
 
 	return string(plaintext), nil
