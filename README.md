@@ -206,7 +206,7 @@ Local config with locally configured cameras.
    "AdTenantId": "_azure_ad_tenant_id_",
    "AuthTokenUrl": "https://login.microsoftonline.com/_azure_ad_tenant_id_/oauth2/v2.0/token",
    "ClientID": "_service_principal_client_id_",
-   "Secret": "cdf_client_secret",
+   "Secret": "cdf_client_secret", 
    "Scopes": [
      "https://az-power-no-northeurope.cognitedata.com/.default"
    ],
@@ -263,7 +263,7 @@ The service support 3 ways of storing secrets :
 
 Encryption and decryption is done using AES-256 algorithm with 32 bytes long key. The key is set during build time but can be changed by setting `EDGE_EXT_SECRET_KEY` environment variable.
 
-The service also can fetch secrets from environment variables. The name of the environment variable must match the name of the secret in config file. Example : a secret can be set as environment variable `CDF_CLIENT_SECRET` and the service will fetch the value from environment variable , in config file it should be referenced  `"Secret": "cdf_client_secret"` or `"Password": "CDF_CLIENT_SECRET"`
+The service also can fetch secrets from environment variables. The name of the environment variable must match the name of the secret in config file. Example : a secret can be set as environment variable `CDF_CLIENT_SECRET` and the service will fetch the value from environment variable , in config file it should be referenced  `"Secret": "cdf_client_secret"` or `"Password": "NAME_OF_ENV_VAR_THAT_STORES_SECRET"` 
 
 
 The service provides convenient way to encrypt all secrets in config file using CLI command `edge-extractor --op encrypt_config`. The command will generate new config file with encrypted secrets and save it to `config_encrypted.json` file.
