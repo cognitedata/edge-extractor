@@ -68,8 +68,8 @@ func (intgr *CameraImagesToCdf) Start() error {
 		go func() {
 			for configAction := range configQueue {
 				config := configAction.Config.(*IntegrationConfig)
-				log.Debugf("Old config for ingration : %+v\n ", intgr.integrationConfig)
-				log.Debugf("New config for ingration : %+v\n ", config)
+				// log.Debugf("Old config for ingration : %+v\n ", intgr.integrationConfig)
+				// log.Debugf("New config for ingration : %+v\n ", config)
 
 				if !intgr.integrationConfig.IsEqual(config) {
 					log.Info("Config has been changed . Restarting processors")

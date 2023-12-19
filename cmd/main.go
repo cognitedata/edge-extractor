@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -18,8 +19,9 @@ import (
 
 var Version string
 var EncryptionKey = ""
-var systemLog service.Logger
 var fullConfigPath string
+var systemLog service.Logger
+var runMode = "service"
 
 type Integration interface {
 	Start() error
@@ -51,12 +53,25 @@ func (p *program) Stop(s service.Service) error {
 }
 
 // configureService configures the edge extractor as OS service. Applicable when running on Windows or Linux as service.
-func configureService() service.Service {
-	svcConfig := service.Config{Name: "cog-edge-extractor", DisplayName: "Cognite edge extractor", Description: "Cognite edge extractor service"}
+func configureService(isInstallOperation bool) service.Service {
+	svcConfig := service.Config{
+		Name:        "edge-extractor",
+		DisplayName: "Cognite edge extractor",
+		Description: "Cognite edge extractor service",
+	}
 	var prg program
 	var err error
 	var appService service.Service
-
+	if runtime.GOOS == "linux" && isInstallOperation {
+		err = internal.PrepareLinuxServiceEnv()
+		if err != nil {
+			log.Error("Failed to prepare edge-extractor environment. Err:", err.Error())
+			os.Exit(1)
+		}
+		svcConfig.Executable = internal.LINUX_BIN
+		svcConfig.Arguments = []string{"--config", internal.LINUX_CONFIG_FILE}
+		svcConfig.UserName = internal.LINUX_USER
+	}
 	appService, err = service.New(&prg, &svcConfig)
 	if err != nil {
 		log.Fatal(err)
@@ -69,10 +84,9 @@ func configureService() service.Service {
 	}
 
 	return appService
-
 }
 
-func configureLogger(logPath, level string) {
+func configureLogger(logDir, level string) {
 	if level == "" {
 		level = "info"
 	}
@@ -83,9 +97,18 @@ func configureLogger(logPath, level string) {
 		TimestampFormat: "2006-01-02 15:04:05",
 		FullTimestamp:   true,
 	})
-	// open a file
-	if logPath != "" && logPath != "-" {
+	var logPath string
+	if logDir != "" && logDir != "-" {
 		logPath = filepath.Join(logPath, "edge-extractor.log")
+	} else if runtime.GOOS == "linux" && runMode == "service" {
+		// linux service must write logs to /var/log/edge-extractor directory
+		logPath = filepath.Join(internal.LINUX_LOG_DIR, "edge-extractor.log")
+	} else if runtime.GOOS == "windows" && runMode == "service" {
+		// windows service must write logs to C:\Cognite\EdgeExtractor directory
+		logPath = filepath.Join(internal.GetBinaryDir(), "edge-extractor.log")
+	}
+	if logPath != "" {
+		fmt.Println("Log file path : ", logPath)
 		f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0666)
 		if err != nil {
 			fmt.Printf("error opening file: %v", err)
@@ -93,7 +116,6 @@ func configureLogger(logPath, level string) {
 		}
 		log.SetOutput(f)
 	}
-
 }
 
 func encryptSecretsInConfig(configPath string) error {
@@ -166,7 +188,6 @@ func startEdgeExtractor(mainConfigPath string) {
 			// TODO : Start config ui webserver here
 			return
 		}
-
 		err = json.Unmarshal(configBody, &config)
 		if err != nil {
 			systemLog.Error("Incorrect config file format. Err:", err.Error())
@@ -175,11 +196,7 @@ func startEdgeExtractor(mainConfigPath string) {
 		}
 	}
 
-	logDir := internal.GetBinaryDir()
-	if config.LogDir != "" {
-		logDir = config.LogDir
-	}
-	configureLogger(logDir, config.LogLevel)
+	configureLogger(config.LogDir, config.LogLevel)
 
 	log.Info("Starting edge-extractor service.")
 	secretManager := internal.NewSecretManager(EncryptionKey)
@@ -235,9 +252,6 @@ func stopExtractor() {
 func main() {
 
 	log.Infof("----- Starting edge-extractor - version = %s ----------", Version)
-	// print working directory
-	dir, _ := os.Getwd()
-	log.Debug("Working directory : ", dir)
 	mainConfigPath := flag.String("config", "config.json", "Full path to main configuration file")
 
 	base64encodedConfig := flag.String("bconfig", "", "Base64 encoded config")
@@ -324,7 +338,8 @@ func main() {
 
 	case "install":
 		log.Info("Installing edge-extractor service")
-		appService := configureService()
+		runMode = "service"
+		appService := configureService(true)
 		err := appService.Install()
 		if err != nil {
 			log.Error("Failed to install service.Make sure you run installation as system administrator Err: ", err.Error())
@@ -333,22 +348,32 @@ func main() {
 			if err != nil {
 				log.Error("Failed to run service. Err: ", err.Error())
 			}
+			log.Info("Service has been installed and started")
 		}
 	case "uninstall":
 		log.Info("Uninstalling edge-extractor service")
-		appService := configureService()
+		appService := configureService(false)
 		err := appService.Uninstall()
 
 		if err != nil {
 			log.Error("Failed to uninstall service", err.Error())
 		}
+		if runtime.GOOS == "linux" {
+			internal.RemoveLinuxServiceEnv()
+		}
+	case "update":
+		log.Info("Updating edge-extractor service binary")
+		internal.UpdateLinuxServiceBinary()
+
 	case "run":
-		// Should be used to start service from CLI
+		// Should be used to start service from CLI\
+		runMode = "cli"
 		startEdgeExtractor(*mainConfigPath)
 		select {}
 	default:
 		// Used by OS service supervisor
-		appService := configureService()
+		runMode = "service"
+		appService := configureService(false)
 		err := appService.Run()
 		if err != nil {
 			log.Error(err)

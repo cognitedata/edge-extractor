@@ -2,6 +2,7 @@ package ffmpeg
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os/exec"
 	"runtime"
@@ -123,7 +124,7 @@ func getCameraData(device string, camera *Camera) error {
 
 // Once the user calls Read() for the first time on a Camera struct,
 // the ffmpeg command which is used to read the camera device is started.
-func initLocalCamera(camera *Camera) error {
+func InitLocalCamera(camera *Camera) error {
 	// If user exits with Ctrl+C, stop ffmpeg process.
 	camera.cleanup()
 
@@ -160,5 +161,6 @@ func initLocalCamera(camera *Camera) error {
 	}
 
 	camera.framebuffer = make([]byte, camera.width*camera.height*camera.depth)
+	fmt.Println("Camera initialized")
 	return nil
 }

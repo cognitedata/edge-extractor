@@ -10,7 +10,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 
 	log "github.com/sirupsen/logrus"
@@ -39,8 +38,8 @@ func GetBinaryDir() string {
 	if runtime.GOOS == "windows" {
 		return "C:\\Cognite\\EdgeExtractor"
 	}
-	filename := os.Args[1] // get command line first parameter
-	return filepath.Dir(filename)
+	currentDir, _ := os.Getwd()
+	return currentDir
 }
 
 func EncryptString(key, text string) (string, error) {
