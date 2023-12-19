@@ -39,6 +39,15 @@ Supported camera drivers :
 - Flir Ax8 - `flir_ax8`
 - Dahua - `dahua`
 
+### Installation
+
+1. Download the latest release from [here](https://github.com/cognitedata/edge-extractor/releases). In linux you can use `wget` command to download the binary from CLI. Example : `wget https://github.com/cognitedata/edge-extractor/releases/download/v0.5.1/edge-extractor-linux-amd64`. Each release contains binaries for Windows , OSX , Linux and docker image (work in progress). Instructions below are for Linux but can be easily adapted for other platforms just by replacing binary name , for example `edge-extractor-win-amd64.exe` for Windows instead of `edge-extractor-linux-amd64` , similarly for OSX.
+2. Make the binary executable `chmod +x edge-extractor-linux-amd64` ( only for Linux )
+3. Create config file `config.json` (see example below) and place it in the same folder as the binary
+4. Run the extractor from cli or install it as a service (see below): 
+  - `./edge-extractor-linux-amd64 --op run --config.json` - run the extractor in command line
+  - `sudo ./edge-extractor-linux-amd64 --op install` - install the extractor as a service . The service will be started automatically after installation and will be started automatically after system reboot. Logs will be written to `/var/log/edge-extractor.log` file and config file will be located in `/etc/edge-extractor/config.json` . The service can be uninstalled by running `./edge-extractor-linux-amd64 --op uninstall` command. New version of the service can be installed by running `./edge-extractor-linux-amd64 --op update` command. The service must be stopped before running update command using command `sudo service edge-extractor stop` .
+
 
 ### Configurations
 
@@ -86,6 +95,7 @@ Parameter | Description | Example
 `Username` | Username | `admin`
 `Password` | Password. It can be either plain text value of key that must exist in Secrets section of config or ENV variable. | `admin`
 `State` | State of the camera (enabled/disabled) | `enabled`
+`LinkedAssetID` | ID of Asset that repsents camera (OPTIONAL) . All images are linked to that Asset if configured | 403447394704254
 
 
 
@@ -94,6 +104,7 @@ Parameter | Description | Example
 `--op` - operation , supported operations : 
    - `run` - rund the service in command line 
    - `install` - installs the service as windows , osx or linux service
+   - `update` - updates the service binary. The service must be stopped before running this command. 
    - `uninstall` - uninstalls the service 
    - `gen_config` - generates default config
    - `encrypt_config` - encrypts all Secret and password field in config file

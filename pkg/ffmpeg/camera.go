@@ -1,6 +1,7 @@
 package ffmpeg
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -64,8 +65,13 @@ func (camera *Camera) Read() bool {
 
 	total := 0
 	for total < camera.width*camera.height*camera.depth {
+		if camera.pipe == nil {
+			fmt.Println("Pipe is nil")
+			return false
+		}
 		n, _ := (*camera.pipe).Read(camera.framebuffer[total:])
 		total += n
+		fmt.Println("Read ", n, " bytes")
 	}
 	return true
 }

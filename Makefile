@@ -1,8 +1,6 @@
-version="0.5.1"
+version="0.6.0"
 encryption_key=${CONFIG_ENCRYPTION_KEY}
 test_encryption_key=test_key_ZU8uJ8vxJs7Z75uF3Jy8m52 # gitleaks:allow
-set_private_repos :
-	go get github.com/cognitedata/cognite-sdk-go
 
 run :
 	go run cmd/main.go --config config_encrypted_local.json --key ${test_encryption_key}
@@ -45,3 +43,6 @@ test-docker:
 	docker run -it --rm --name edge-extractor cognite/edge-extractor:${version} 
 prepare-test-data:
 	cp imgdump-src/* imgdump/
+
+set_private_repos :
+	go get github.com/cognitedata/cognite-sdk-go
