@@ -1,17 +1,18 @@
 package ip_cams_to_cdf
 
 type CameraConfig struct {
-	ID              uint64
-	ExternalID      string
-	Name            string
-	Model           string
-	Address         string
-	Username        string
-	Password        string
-	Mode            string
-	PollingInterval int
-	State           string
-	LinkedAssetID   uint64
+	ID                      uint64
+	ExternalID              string
+	Name                    string
+	Model                   string
+	Address                 string
+	Username                string
+	Password                string
+	Mode                    string
+	PollingInterval         int
+	State                   string
+	LinkedAssetID           uint64
+	EnableCameraEventStream bool
 }
 
 // Compare CameraConfig with anothert CameraConfig
@@ -24,7 +25,8 @@ func (c *CameraConfig) IsEqual(other *CameraConfig) bool {
 		c.Mode == other.Mode &&
 		c.PollingInterval == other.PollingInterval &&
 		c.State == other.State &&
-		c.LinkedAssetID == other.LinkedAssetID
+		c.LinkedAssetID == other.LinkedAssetID &&
+		c.EnableCameraEventStream == other.EnableCameraEventStream
 }
 
 type IntegrationConfig struct {

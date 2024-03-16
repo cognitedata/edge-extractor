@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	edgedac "github.com/cognitedata/edge-extractor/internal/auth/digest"
+	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 	dac "github.com/xinsnake/go-http-digest-auth-client"
 )
@@ -14,6 +16,22 @@ import (
 type AxisCameraDriver struct {
 	httpClient      http.Client
 	digestTransport *dac.DigestTransport
+}
+
+type EventFilter struct {
+	TopicFilter   string `json:"topicFilter,omitempty"`
+	ContentFilter string `json:"contentFilter,omitempty"`
+}
+
+type EventParams struct {
+	EventFilterList []EventFilter `json:"eventFilterList"`
+}
+
+type Event struct {
+	APIVersion string      `json:"apiVersion"`
+	Context    string      `json:"context"`
+	Method     string      `json:"method"`
+	Params     EventParams `json:"params"`
 }
 
 func NewAxisCameraDriver() Driver {
@@ -75,4 +93,85 @@ func (cam *AxisCameraDriver) Ping(address string) bool {
 
 func (cam *AxisCameraDriver) Commit(transactionId string) error {
 	return nil
+}
+
+// Connect to Axis WebSocket API and subscribe to events from the camera , for example motion detection
+
+func (cam *AxisCameraDriver) SubscribeToEventsStream(address, username, password string) (stream chan CameraEvent, err error) {
+	// convert the address to a websocket address
+	digestAddress := address + "/vapix/ws-data-stream?sources=events"
+	digestRequest := edgedac.NewRequest(username, password, "GET", digestAddress, "")
+
+	address = strings.Replace(address, "http", "ws", 1) + "/vapix/ws-data-stream?sources=events"
+
+	log.Debug("Connecting to camera websocket at ", address)
+	var authHeader string
+	c, resp, err := websocket.DefaultDialer.Dial(address, nil)
+	if resp.StatusCode == 401 {
+		authHeader, err = digestRequest.GetNewDigestAuthHeaderFromResponse(resp)
+		if err != nil {
+			log.Error("Error getting new digest auth header:", err)
+			return nil, err
+		}
+		header := http.Header{"Authorization": []string{authHeader}}
+		log.Debug("Using auth header ", header)
+		c, resp, err = websocket.DefaultDialer.Dial(address, header)
+	}
+
+	if err != nil {
+		log.Error("Error connecting to camera websocket:", err)
+		if resp != nil {
+			log.Info("Response from camera websocket:", resp.Status)
+			log.Info("Response headers from camera websocket:", resp.Header)
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			log.Info("Response body from camera websocket:", string(bodyBytes))
+		}
+		return nil, err
+	}
+
+	messages := make(chan CameraEvent, 10)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Info("Recovered from panic:", r)
+				log.Info("Disconnected from camera websocket.")
+			}
+			defer c.Close()
+		}()
+		log.Info("Connected to camera websocket and subscribed to events.")
+		eventFilter := Event{
+			APIVersion: "1.0",
+			Context:    "edge-extractor event subscription",
+			Method:     "events:configure",
+			Params: EventParams{
+				EventFilterList: []EventFilter{
+					{
+						TopicFilter: "tnsaxis:CameraApplicationPlatform/FenceGuardCamera1ProfileANY", //tnsaxis:CameraApplicationPlatform/FenceGuardCamera1ProfileANY
+					},
+					{
+						TopicFilter: "tns1:Device/tnsaxis:IO/Port",
+					},
+				},
+			},
+		}
+		log.Debugf("eventFilter: %+v\n", eventFilter)
+		c.WriteJSON(eventFilter)
+		for {
+			mt, message, err := c.ReadMessage()
+			if err != nil {
+				log.Info("Error from WS stream:", err)
+				close(messages)
+				break
+			}
+			select {
+			case messages <- CameraEvent{Data: message, Type: fmt.Sprint(mt)}:
+				// Message sent successfully
+			default:
+				// Channel is full, message not sent
+				log.Info("Channel is full, message not sent")
+			}
+		}
+		log.Info("Disconnected from camera websocket.")
+	}()
+	return messages, nil
 }

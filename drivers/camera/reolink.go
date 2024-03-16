@@ -61,3 +61,7 @@ func (cam *ReolinkCameraDriver) Ping(address string) bool {
 func (cam *ReolinkCameraDriver) Commit(transactionId string) error {
 	return nil
 }
+
+func (cam *ReolinkCameraDriver) SubscribeToEventsStream(address, username, password string) (chan CameraEvent, error) {
+	return nil, fmt.Errorf("reolink camera does not support event streams")
+}

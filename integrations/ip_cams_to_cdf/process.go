@@ -156,6 +156,9 @@ func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(camera CameraConf
 		return fmt.Errorf("unsupported camera model")
 	}
 	intgr.BaseIntegration.StateTracker.SetProcessorCurrentState(camera.ID, internal.ProcessorStateRunning)
+	if camera.EnableCameraEventStream {
+		go intgr.StartSingleCameraEventsProcessingLoop(camera.Name, cam)
+	}
 	for {
 
 		intgr.executeProcessorRun(camera, cam)
@@ -183,7 +186,29 @@ func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(camera CameraConf
 	return nil
 }
 
-// executeProcessorRun executes single processor run (full process) , the operation is blocking and must be started in its own goroute
+func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(name string, camera *inputs.IpCamera) error {
+	log.Infof("Starting camera events processor %s", name)
+	defer func() {
+		if r := recover(); r != nil {
+			stack := string(debug.Stack())
+			log.Error("startProcessor failed to start with error : ", stack)
+		}
+	}()
+
+	stream, err := camera.SubscribeToEventsStream()
+	if err != nil {
+		log.Errorf("Failed to subscribe to camera events stream. Error : %s", err.Error())
+		return err
+	}
+	for event := range stream {
+		log.Infof("Received event from camera %s : %s", name, event.Type)
+		log.Debugf("Event data : %s", string(event.Data))
+	}
+	log.Infof("Camera events stream processor %s exited main loop ", name)
+	return nil
+}
+
+// executeProcessorRun executes single processor run (full process) , the operation is blocking and must be started in its own goroute for low latency and high throughput
 func (intgr *CameraImagesToCdf) executeProcessorRun(camera CameraConfig, cam *inputs.IpCamera) error {
 	defer func() {
 		if r := recover(); r != nil {

@@ -7,6 +7,17 @@ type Image struct {
 	ExternalId    string
 }
 
+type CameraEvent struct {
+	Type string
+	Data []byte
+}
+
+type CameraManifest struct {
+	Make                         string
+	Model                        string
+	IsCameraEventStreamSupported bool
+}
+
 type DriverConstructor func() Driver
 
 type Driver interface {
@@ -14,4 +25,5 @@ type Driver interface {
 	ExtractMetadata(address, username, password string) ([]byte, error)
 	Ping(address string) bool
 	Commit(transactionId string) error
+	SubscribeToEventsStream(address, username, password string) (chan CameraEvent, error)
 }

@@ -70,3 +70,7 @@ func (cam *UrlCameraDriver) Ping(address string) bool {
 func (cam *UrlCameraDriver) Commit(transactionId string) error {
 	return nil
 }
+
+func (cam *UrlCameraDriver) SubscribeToEventsStream(address, username, password string) (chan CameraEvent, error) {
+	return nil, nil
+}

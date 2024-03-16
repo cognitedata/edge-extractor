@@ -1,6 +1,7 @@
 package camera
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -86,4 +87,8 @@ func (cam *FileSystemCameraDriver) Ping(address string) bool {
 func (cam *FileSystemCameraDriver) Commit(transactionId string) error {
 	os.Remove(transactionId)
 	return nil
+}
+
+func (cam *FileSystemCameraDriver) SubscribeToEventsStream(address, username, password string) (chan CameraEvent, error) {
+	return nil, fmt.Errorf("file system camera driver does not support event streaming")
 }

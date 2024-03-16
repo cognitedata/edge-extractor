@@ -86,3 +86,7 @@ func (cam *HikvisionCameraDriver) Ping(address string) bool {
 func (cam *HikvisionCameraDriver) Commit(transactionId string) error {
 	return nil
 }
+
+func (cam *HikvisionCameraDriver) SubscribeToEventsStream(address, username, password string) (chan CameraEvent, error) {
+	return nil, fmt.Errorf("Hikvision camera driver does not support event streaming")
+}

@@ -9,6 +9,7 @@ require (
 
 require (
 	github.com/golang/protobuf v1.4.3 // indirect
+	github.com/gorilla/websocket v1.5.1
 	github.com/kardianos/service v1.2.0
 	github.com/kelseyhightower/envconfig v1.4.0 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.3 // indirect

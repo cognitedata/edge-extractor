@@ -43,6 +43,13 @@ func (cam *IpCamera) ExtractImage() (*camera.Image, error) {
 	return cam.driver.ExtractImage(cam.address, cam.username, cam.password)
 }
 
+func (cam *IpCamera) SubscribeToEventsStream() (chan camera.CameraEvent, error) {
+	if cam.driver == nil {
+		return nil, fmt.Errorf("unknown driver")
+	}
+	return cam.driver.SubscribeToEventsStream(cam.address, cam.username, cam.password)
+}
+
 func (cam *IpCamera) ExtractMetadata() ([]byte, error) {
 	if cam.driver == nil {
 		return nil, fmt.Errorf("unknown driver")
@@ -55,4 +62,8 @@ func (cam *IpCamera) Commit(transactionId string) error {
 		return fmt.Errorf("unknown driver")
 	}
 	return cam.driver.Commit(transactionId)
+}
+
+func (cam *IpCamera) GetDriver() camera.Driver {
+	return cam.driver
 }

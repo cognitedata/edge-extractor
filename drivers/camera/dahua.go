@@ -77,3 +77,7 @@ func (cam *DahuaCameraDriver) Ping(address string) bool {
 func (cam *DahuaCameraDriver) Commit(transactionId string) error {
 	return nil
 }
+
+func (cam *DahuaCameraDriver) SubscribeToEventsStream(address, username, password string) (chan CameraEvent, error) {
+	return nil, fmt.Errorf("DaHua camera does not support event streaming")
+}

@@ -95,3 +95,7 @@ func (cam *FlirAx8CameraDriver) Ping(address string) bool {
 func (cam *FlirAx8CameraDriver) Commit(transactionId string) error {
 	return nil
 }
+
+func (cam *FlirAx8CameraDriver) SubscribeToEventsStream(address, username, password string) (chan CameraEvent, error) {
+	return nil, fmt.Errorf("FlirAx8 camera does not support event streaming")
+}
