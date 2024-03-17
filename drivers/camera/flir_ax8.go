@@ -2,7 +2,7 @@ package camera
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,6 +15,9 @@ import (
 type FlirAx8CameraDriver struct {
 	httpClient      http.Client
 	digestTransport *dac.DigestTransport
+	address         string
+	username        string
+	password        string
 }
 
 // docs : https://flir.custhelp.com/app/answers/detail/a_id/3602/~/getting-started-using-rest-api-with-automation-cameras
@@ -28,8 +31,15 @@ func NewFlirAx8CameraDriver() Driver {
 	return &FlirAx8CameraDriver{httpClient: httpClient}
 }
 
-func (cam *FlirAx8CameraDriver) ExtractImage(address, username, password string) (*Image, error) {
-	address = address + "/snapshot.jpg"
+func (cam *FlirAx8CameraDriver) Configure(address, username, password string) error {
+	cam.address = address
+	cam.username = username
+	cam.password = password
+	return nil
+}
+
+func (cam *FlirAx8CameraDriver) ExtractImage() (*Image, error) {
+	address := cam.address + "/snapshot.jpg"
 
 	resp, err := cam.httpClient.Get(address)
 	if err != nil {
@@ -42,7 +52,7 @@ func (cam *FlirAx8CameraDriver) ExtractImage(address, username, password string)
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("camera api returned error code %s", resp.Status)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
 		return nil, err
@@ -60,8 +70,8 @@ func (cam *FlirAx8CameraDriver) ExtractImage(address, username, password string)
 	return &img, nil
 }
 
-func (cam *FlirAx8CameraDriver) ExtractMetadata(address, username, password string) ([]byte, error) {
-	address = address + "/res.php"
+func (cam *FlirAx8CameraDriver) ExtractMetadata() ([]byte, error) {
+	address := cam.address + "/res.php"
 
 	data := url.Values{
 		"action": {"measurement"},
@@ -79,7 +89,7 @@ func (cam *FlirAx8CameraDriver) ExtractMetadata(address, username, password stri
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("camera metadata api returned error code %s", resp.Status)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
 		return nil, err
@@ -96,6 +106,6 @@ func (cam *FlirAx8CameraDriver) Commit(transactionId string) error {
 	return nil
 }
 
-func (cam *FlirAx8CameraDriver) SubscribeToEventsStream(address, username, password string) (chan CameraEvent, error) {
+func (cam *FlirAx8CameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error) {
 	return nil, fmt.Errorf("FlirAx8 camera does not support event streaming")
 }

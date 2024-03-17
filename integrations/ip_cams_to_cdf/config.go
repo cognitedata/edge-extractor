@@ -13,10 +13,26 @@ type CameraConfig struct {
 	State                   string
 	LinkedAssetID           uint64
 	EnableCameraEventStream bool
+	EventFilters            []CameraEventFilter
+}
+
+type CameraEventFilter struct {
+	TopicFilter   string
+	ContentFilter string
 }
 
 // Compare CameraConfig with anothert CameraConfig
 func (c *CameraConfig) IsEqual(other *CameraConfig) bool {
+	var isEventFiltersEqual bool
+	if len(c.EventFilters) != len(other.EventFilters) {
+		return false
+	}
+	for i, eventFilter := range c.EventFilters {
+		if eventFilter != other.EventFilters[i] {
+			return false
+		}
+	}
+
 	return c.Name == other.Name &&
 		c.Model == other.Model &&
 		c.Address == other.Address &&
@@ -26,7 +42,9 @@ func (c *CameraConfig) IsEqual(other *CameraConfig) bool {
 		c.PollingInterval == other.PollingInterval &&
 		c.State == other.State &&
 		c.LinkedAssetID == other.LinkedAssetID &&
-		c.EnableCameraEventStream == other.EnableCameraEventStream
+		c.EnableCameraEventStream == other.EnableCameraEventStream &&
+		isEventFiltersEqual
+
 }
 
 type IntegrationConfig struct {

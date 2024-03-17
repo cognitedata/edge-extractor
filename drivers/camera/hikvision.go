@@ -14,6 +14,9 @@ import (
 type HikvisionCameraDriver struct {
 	httpClient      http.Client
 	digestTransport *dac.DigestTransport
+	address         string
+	username        string
+	password        string
 }
 
 func NewHikvisionCameraDriver() Driver {
@@ -23,13 +26,20 @@ func NewHikvisionCameraDriver() Driver {
 	return &HikvisionCameraDriver{httpClient: httpClient}
 }
 
-func (cam *HikvisionCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
+func (cam *HikvisionCameraDriver) Configure(address, username, password string) error {
+	cam.address = address
+	cam.username = username
+	cam.password = password
+	return nil
+}
+
+func (cam *HikvisionCameraDriver) ExtractImage() (*Image, error) {
 	// http://10.22.15.61/ISAPI/Streaming/channels/1/picture
 
-	address = address + "/ISAPI/Streaming/channels/1/picture"
+	address := cam.address + "/ISAPI/Streaming/channels/1/picture"
 
 	if cam.digestTransport == nil {
-		t := dac.NewTransport(username, password)
+		t := dac.NewTransport(cam.username, cam.password)
 		cam.digestTransport = &t
 		cam.digestTransport.HTTPClient = &cam.httpClient
 	}
@@ -75,7 +85,7 @@ func (cam *HikvisionCameraDriver) ExtractImage(address, username, password strin
 	return &img, nil
 }
 
-func (cam *HikvisionCameraDriver) ExtractMetadata(address, username, password string) ([]byte, error) {
+func (cam *HikvisionCameraDriver) ExtractMetadata() ([]byte, error) {
 	return nil, nil
 }
 
@@ -87,6 +97,6 @@ func (cam *HikvisionCameraDriver) Commit(transactionId string) error {
 	return nil
 }
 
-func (cam *HikvisionCameraDriver) SubscribeToEventsStream(address, username, password string) (chan CameraEvent, error) {
+func (cam *HikvisionCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error) {
 	return nil, fmt.Errorf("Hikvision camera driver does not support event streaming")
 }

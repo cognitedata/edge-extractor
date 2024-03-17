@@ -33,28 +33,36 @@ func NewIpCamera(model, address, cType, username, password string) *IpCamera {
 	}
 
 	c := IpCamera{model: model, address: address, cType: cType, driver: driver(), username: username, password: password}
+	c.Configure()
 	return &c
+}
+
+func (cam *IpCamera) Configure() error {
+	if cam.driver == nil {
+		return fmt.Errorf("unknown driver")
+	}
+	return cam.driver.Configure(cam.address, cam.username, cam.password)
 }
 
 func (cam *IpCamera) ExtractImage() (*camera.Image, error) {
 	if cam.driver == nil {
 		return nil, fmt.Errorf("unknown driver")
 	}
-	return cam.driver.ExtractImage(cam.address, cam.username, cam.password)
+	return cam.driver.ExtractImage()
 }
 
-func (cam *IpCamera) SubscribeToEventsStream() (chan camera.CameraEvent, error) {
+func (cam *IpCamera) SubscribeToEventsStream(eventFilters []camera.EventFilter) (chan camera.CameraEvent, error) {
 	if cam.driver == nil {
 		return nil, fmt.Errorf("unknown driver")
 	}
-	return cam.driver.SubscribeToEventsStream(cam.address, cam.username, cam.password)
+	return cam.driver.SubscribeToEventsStream(eventFilters)
 }
 
 func (cam *IpCamera) ExtractMetadata() ([]byte, error) {
 	if cam.driver == nil {
 		return nil, fmt.Errorf("unknown driver")
 	}
-	return cam.driver.ExtractMetadata(cam.address, cam.username, cam.password)
+	return cam.driver.ExtractMetadata()
 }
 
 func (cam *IpCamera) Commit(transactionId string) error {

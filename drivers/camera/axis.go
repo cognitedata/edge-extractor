@@ -16,22 +16,25 @@ import (
 type AxisCameraDriver struct {
 	httpClient      http.Client
 	digestTransport *dac.DigestTransport
+	address         string
+	username        string
+	password        string
 }
 
-type EventFilter struct {
+type AxisEventFilter struct {
 	TopicFilter   string `json:"topicFilter,omitempty"`
 	ContentFilter string `json:"contentFilter,omitempty"`
 }
 
-type EventParams struct {
-	EventFilterList []EventFilter `json:"eventFilterList"`
+type AxisEventParams struct {
+	EventFilterList []AxisEventFilter `json:"eventFilterList"`
 }
 
-type Event struct {
-	APIVersion string      `json:"apiVersion"`
-	Context    string      `json:"context"`
-	Method     string      `json:"method"`
-	Params     EventParams `json:"params"`
+type AxisEvent struct {
+	APIVersion string          `json:"apiVersion"`
+	Context    string          `json:"context"`
+	Method     string          `json:"method"`
+	Params     AxisEventParams `json:"params"`
 }
 
 func NewAxisCameraDriver() Driver {
@@ -41,11 +44,18 @@ func NewAxisCameraDriver() Driver {
 	return &AxisCameraDriver{httpClient: httpClient}
 }
 
-func (cam *AxisCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
+func (cam *AxisCameraDriver) Configure(address, username, password string) error {
+	cam.address = address
+	cam.username = username
+	cam.password = password
+	return nil
+}
+
+func (cam *AxisCameraDriver) ExtractImage() (*Image, error) {
 	//"http://10.22.15.62/axis-cgi/jpg/image.cgi"
-	address = address + "/axis-cgi/jpg/image.cgi"
+	address := cam.address + "/axis-cgi/jpg/image.cgi"
 	if cam.digestTransport == nil {
-		t := dac.NewTransport(username, password)
+		t := dac.NewTransport(cam.username, cam.password)
 		cam.digestTransport = &t
 		cam.digestTransport.HTTPClient = &cam.httpClient
 	}
@@ -83,7 +93,7 @@ func (cam *AxisCameraDriver) ExtractImage(address, username, password string) (*
 	return &img, nil
 }
 
-func (cam *AxisCameraDriver) ExtractMetadata(address, username, password string) ([]byte, error) {
+func (cam *AxisCameraDriver) ExtractMetadata() ([]byte, error) {
 	return nil, nil
 }
 
@@ -97,12 +107,11 @@ func (cam *AxisCameraDriver) Commit(transactionId string) error {
 
 // Connect to Axis WebSocket API and subscribe to events from the camera , for example motion detection
 
-func (cam *AxisCameraDriver) SubscribeToEventsStream(address, username, password string) (stream chan CameraEvent, err error) {
+func (cam *AxisCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) (stream chan CameraEvent, err error) {
 	// convert the address to a websocket address
-	digestAddress := address + "/vapix/ws-data-stream?sources=events"
-	digestRequest := edgedac.NewRequest(username, password, "GET", digestAddress, "")
-
-	address = strings.Replace(address, "http", "ws", 1) + "/vapix/ws-data-stream?sources=events"
+	digestAddress := cam.address + "/vapix/ws-data-stream?sources=events"
+	digestRequest := edgedac.NewRequest(cam.username, cam.password, "GET", digestAddress, "")
+	address := strings.Replace(cam.address, "http", "ws", 1) + "/vapix/ws-data-stream?sources=events"
 
 	log.Debug("Connecting to camera websocket at ", address)
 	var authHeader string
@@ -129,6 +138,11 @@ func (cam *AxisCameraDriver) SubscribeToEventsStream(address, username, password
 		return nil, err
 	}
 
+	axisEventFilterList := make([]AxisEventFilter, len(eventFilters))
+	for i, filter := range eventFilters {
+		axisEventFilterList[i] = AxisEventFilter(filter)
+	}
+
 	messages := make(chan CameraEvent, 10)
 	go func() {
 		defer func() {
@@ -139,19 +153,12 @@ func (cam *AxisCameraDriver) SubscribeToEventsStream(address, username, password
 			defer c.Close()
 		}()
 		log.Info("Connected to camera websocket and subscribed to events.")
-		eventFilter := Event{
+		eventFilter := AxisEvent{
 			APIVersion: "1.0",
 			Context:    "edge-extractor event subscription",
 			Method:     "events:configure",
-			Params: EventParams{
-				EventFilterList: []EventFilter{
-					{
-						TopicFilter: "tnsaxis:CameraApplicationPlatform/FenceGuardCamera1ProfileANY", //tnsaxis:CameraApplicationPlatform/FenceGuardCamera1ProfileANY
-					},
-					{
-						TopicFilter: "tns1:Device/tnsaxis:IO/Port",
-					},
-				},
+			Params: AxisEventParams{
+				EventFilterList: axisEventFilterList,
 			},
 		}
 		log.Debugf("eventFilter: %+v\n", eventFilter)

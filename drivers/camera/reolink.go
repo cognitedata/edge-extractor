@@ -11,6 +11,9 @@ import (
 
 type ReolinkCameraDriver struct {
 	httpClient http.Client
+	address    string
+	username   string
+	password   string
 }
 
 func NewReolinkCameraDriver() Driver {
@@ -20,9 +23,16 @@ func NewReolinkCameraDriver() Driver {
 	return &ReolinkCameraDriver{httpClient: httpClient}
 }
 
-func (cam *ReolinkCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
+func (cam *ReolinkCameraDriver) Configure(address, username, password string) error {
+	cam.address = address
+	cam.username = username
+	cam.password = password
+	return nil
+}
 
-	address = fmt.Sprintf("%s&user=%s&password=%s", address, username, password)
+func (cam *ReolinkCameraDriver) ExtractImage() (*Image, error) {
+
+	address := fmt.Sprintf("%s&user=%s&password=%s", cam.address, cam.username, cam.password)
 	resp, err := cam.httpClient.Get(address)
 	if err != nil {
 		return nil, err
@@ -50,7 +60,7 @@ func (cam *ReolinkCameraDriver) ExtractImage(address, username, password string)
 	return &img, nil
 }
 
-func (cam *ReolinkCameraDriver) ExtractMetadata(address, username, password string) ([]byte, error) {
+func (cam *ReolinkCameraDriver) ExtractMetadata() ([]byte, error) {
 	return nil, nil
 }
 
@@ -62,6 +72,6 @@ func (cam *ReolinkCameraDriver) Commit(transactionId string) error {
 	return nil
 }
 
-func (cam *ReolinkCameraDriver) SubscribeToEventsStream(address, username, password string) (chan CameraEvent, error) {
+func (cam *ReolinkCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error) {
 	return nil, fmt.Errorf("reolink camera does not support event streams")
 }

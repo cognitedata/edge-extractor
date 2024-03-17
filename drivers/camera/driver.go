@@ -12,6 +12,11 @@ type CameraEvent struct {
 	Data []byte
 }
 
+type EventFilter struct {
+	TopicFilter   string
+	ContentFilter string
+}
+
 type CameraManifest struct {
 	Make                         string
 	Model                        string
@@ -21,9 +26,10 @@ type CameraManifest struct {
 type DriverConstructor func() Driver
 
 type Driver interface {
-	ExtractImage(address, username, password string) (*Image, error)
-	ExtractMetadata(address, username, password string) ([]byte, error)
+	Configure(address, username, password string) error
+	ExtractImage() (*Image, error)
+	ExtractMetadata() ([]byte, error)
 	Ping(address string) bool
 	Commit(transactionId string) error
-	SubscribeToEventsStream(address, username, password string) (chan CameraEvent, error)
+	SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error)
 }

@@ -11,6 +11,9 @@ import (
 
 type UrlCameraDriver struct {
 	httpClient http.Client
+	address    string
+	username   string
+	password   string
 }
 
 func NewUrlCameraDriver() Driver {
@@ -20,16 +23,23 @@ func NewUrlCameraDriver() Driver {
 	return &UrlCameraDriver{httpClient: httpClient}
 }
 
-func (cam *UrlCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
+func (cam *UrlCameraDriver) Configure(address, username, password string) error {
+	cam.address = address
+	cam.username = username
+	cam.password = password
+	return nil
+}
+
+func (cam *UrlCameraDriver) ExtractImage() (*Image, error) {
 
 	// resp, err := cam.httpClient.Get(address)
 
-	req, err := http.NewRequest("GET", address, nil)
+	req, err := http.NewRequest("GET", cam.address, nil)
 	if err != nil {
 		return nil, err
 	}
-	if username != "" && password != "" {
-		req.SetBasicAuth(username, password)
+	if cam.username != "" && cam.password != "" {
+		req.SetBasicAuth(cam.username, cam.password)
 	}
 	resp, err := cam.httpClient.Do(req)
 
@@ -59,7 +69,7 @@ func (cam *UrlCameraDriver) ExtractImage(address, username, password string) (*I
 	return &img, nil
 }
 
-func (cam *UrlCameraDriver) ExtractMetadata(address, username, password string) ([]byte, error) {
+func (cam *UrlCameraDriver) ExtractMetadata() ([]byte, error) {
 	return nil, nil
 }
 
@@ -71,6 +81,6 @@ func (cam *UrlCameraDriver) Commit(transactionId string) error {
 	return nil
 }
 
-func (cam *UrlCameraDriver) SubscribeToEventsStream(address, username, password string) (chan CameraEvent, error) {
+func (cam *UrlCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error) {
 	return nil, nil
 }

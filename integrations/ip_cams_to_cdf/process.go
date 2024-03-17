@@ -8,6 +8,7 @@ import (
 
 	"github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core"
 	"github.com/cognitedata/edge-extractor/connectors/inputs"
+	"github.com/cognitedata/edge-extractor/drivers/camera"
 	"github.com/cognitedata/edge-extractor/integrations"
 	"github.com/cognitedata/edge-extractor/internal"
 	log "github.com/sirupsen/logrus"
@@ -123,52 +124,58 @@ func (intgr *CameraImagesToCdf) restartProcessor(camera CameraConfig) {
 }
 
 // startProcessor starts camera processor , the operation is blocking and must be started in its own goroute
-func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(camera CameraConfig) error {
-	log.Infof("Starting camera processor %s", camera.Name)
+func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(cameraConfig CameraConfig) error {
+	log.Infof("Starting camera processor %s", cameraConfig.Name)
 	defer func() {
 		if r := recover(); r != nil {
 			stack := string(debug.Stack())
 			log.Error("startProcessor failed to start with error : ", stack)
 		}
-		intgr.BaseIntegration.StateTracker.SetProcessorCurrentState(camera.ID, internal.ProcessorStateStopped)
+		intgr.BaseIntegration.StateTracker.SetProcessorCurrentState(cameraConfig.ID, internal.ProcessorStateStopped)
 	}()
 
-	intgr.BaseIntegration.StateTracker.SetProcessorCurrentState(camera.ID, internal.ProcessorStateStarting)
-	intgr.BaseIntegration.StateTracker.SetProcessorTargetState(camera.ID, internal.ProcessorStateRunning)
+	intgr.BaseIntegration.StateTracker.SetProcessorCurrentState(cameraConfig.ID, internal.ProcessorStateStarting)
+	intgr.BaseIntegration.StateTracker.SetProcessorTargetState(cameraConfig.ID, internal.ProcessorStateRunning)
 	var pollingInterval time.Duration
 
-	log.Infof("Non-default polling interval = %d", camera.PollingInterval)
-	pollingInterval = time.Duration(camera.PollingInterval) * time.Second
+	log.Infof("Non-default polling interval = %d", cameraConfig.PollingInterval)
+	pollingInterval = time.Duration(cameraConfig.PollingInterval) * time.Second
 
 	if pollingInterval < 1 {
 		pollingInterval = 60 * time.Second
 	}
 
-	log.Infof("Camera name = %s, model = %s, address = %s, username = %s, mode = %s", camera.Name, camera.Model, camera.Address, camera.Username, camera.Mode)
+	log.Infof("Camera name = %s, model = %s, address = %s, username = %s, mode = %s", cameraConfig.Name, cameraConfig.Model, cameraConfig.Address, cameraConfig.Username, cameraConfig.Mode)
 
-	if camera.Model == "" || camera.Address == "" {
-		log.Errorf("Processor can't be started for camera %s . Model or address aren't set.", camera.Name)
+	if cameraConfig.Model == "" || cameraConfig.Address == "" {
+		log.Errorf("Processor can't be started for camera %s . Model or address aren't set.", cameraConfig.Name)
 		return fmt.Errorf("empty asset model or address")
 	}
-	cam := inputs.NewIpCamera(camera.Model, camera.Address, "", camera.Username, intgr.secretManager.GetSecret(camera.Password))
+	cam := inputs.NewIpCamera(cameraConfig.Model, cameraConfig.Address, "", cameraConfig.Username, intgr.secretManager.GetSecret(cameraConfig.Password))
 	if cam == nil {
 		log.Error("Unsupported camera model")
 		return fmt.Errorf("unsupported camera model")
 	}
-	intgr.BaseIntegration.StateTracker.SetProcessorCurrentState(camera.ID, internal.ProcessorStateRunning)
-	if camera.EnableCameraEventStream {
-		go intgr.StartSingleCameraEventsProcessingLoop(camera.Name, cam)
+	intgr.BaseIntegration.StateTracker.SetProcessorCurrentState(cameraConfig.ID, internal.ProcessorStateRunning)
+
+	cameraEventFilters := make([]camera.EventFilter, len(cameraConfig.EventFilters))
+	for i, filter := range cameraConfig.EventFilters {
+		cameraEventFilters[i] = camera.EventFilter(filter)
+	}
+
+	if cameraConfig.EnableCameraEventStream {
+		go intgr.StartSingleCameraEventsProcessingLoop(cameraConfig.Name, cam, cameraEventFilters)
 	}
 	for {
 
-		intgr.executeProcessorRun(camera, cam)
+		intgr.executeProcessorRun(cameraConfig, cam)
 
 		if !intgr.IsRunning {
 			break
 		}
 		// TODO : Randomize delays to distribute load
 		time.Sleep(pollingInterval)
-		st := intgr.BaseIntegration.StateTracker.GetProcessorState(camera.ID)
+		st := intgr.BaseIntegration.StateTracker.GetProcessorState(cameraConfig.ID)
 		if st == nil {
 			break
 		} else {
@@ -177,16 +184,16 @@ func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(camera CameraConf
 			}
 		}
 
-		if camera.Mode == "camera+metadata" {
-			intgr.executeCameraMetadataProcessorRun(camera, cam)
+		if cameraConfig.Mode == "camera+metadata" {
+			intgr.executeCameraMetadataProcessorRun(cameraConfig, cam)
 		}
 	}
-	log.Infof("Processor %d exited main loop ", camera.ID)
-	intgr.BaseIntegration.StateTracker.SetProcessorCurrentState(camera.ID, internal.ProcessorStateStopped)
+	log.Infof("Processor %d exited main loop ", cameraConfig.ID)
+	intgr.BaseIntegration.StateTracker.SetProcessorCurrentState(cameraConfig.ID, internal.ProcessorStateStopped)
 	return nil
 }
 
-func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(name string, camera *inputs.IpCamera) error {
+func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(name string, camera *inputs.IpCamera, eventFilters []camera.EventFilter) error {
 	log.Infof("Starting camera events processor %s", name)
 	defer func() {
 		if r := recover(); r != nil {
@@ -195,7 +202,7 @@ func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(name strin
 		}
 	}()
 
-	stream, err := camera.SubscribeToEventsStream()
+	stream, err := camera.SubscribeToEventsStream(eventFilters)
 	if err != nil {
 		log.Errorf("Failed to subscribe to camera events stream. Error : %s", err.Error())
 		return err
