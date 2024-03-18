@@ -8,8 +8,12 @@ type Image struct {
 }
 
 type CameraEvent struct {
-	Type string
-	Data []byte
+	CoreType  string
+	Type      string
+	Topic     string
+	Source    string
+	Timestamp int64
+	RawData   []byte
 }
 
 type EventFilter struct {

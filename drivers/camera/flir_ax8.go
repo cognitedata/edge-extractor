@@ -9,15 +9,13 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	dac "github.com/xinsnake/go-http-digest-auth-client"
 )
 
 type FlirAx8CameraDriver struct {
-	httpClient      http.Client
-	digestTransport *dac.DigestTransport
-	address         string
-	username        string
-	password        string
+	httpClient http.Client
+	address    string
+	username   string
+	password   string
 }
 
 // docs : https://flir.custhelp.com/app/answers/detail/a_id/3602/~/getting-started-using-rest-api-with-automation-cameras

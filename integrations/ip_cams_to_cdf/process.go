@@ -209,7 +209,25 @@ func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(name strin
 	}
 	for event := range stream {
 		log.Infof("Received event from camera %s : %s", name, event.Type)
-		log.Debugf("Event data : %s", string(event.Data))
+		// log.Debugf("Event data : %s", string(event.RawData))
+		// log.Debugf("Time from Axis WS stream: %d", event.Timestamp)
+		cdfEvents := core.EventList{
+			core.Event{
+				StartTime:   event.Timestamp,
+				EndTime:     event.Timestamp,
+				Type:        event.CoreType,
+				Subtype:     event.Type,
+				Description: "",
+				Metadata:    map[string]string{"cameraName": name, "topic": event.Topic, "rawData": string(event.RawData)},
+				Source:      "edge-extractor:camera",
+			},
+		}
+		_, err := intgr.CogClient.Client().Events.Create(cdfEvents)
+		if err != nil {
+			log.Errorf("Failed to publish event to CDF. Error : %s", err.Error())
+			continue
+		}
+
 	}
 	log.Infof("Camera events stream processor %s exited main loop ", name)
 	return nil

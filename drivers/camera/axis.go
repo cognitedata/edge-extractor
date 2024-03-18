@@ -1,6 +1,7 @@
 package camera
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,8 +27,20 @@ type AxisEventFilter struct {
 	ContentFilter string `json:"contentFilter,omitempty"`
 }
 
+type AxisNotificationMessage struct {
+	Source map[string]string `json:"source,omitempty"`
+	Key    map[string]string `json:"key,omitempty"`
+	Data   map[string]string `json:"data,omitempty"`
+}
+type AxisNotification struct {
+	Topic     string                  `json:"topic,omitempty"`
+	Timestamp int64                   `json:"timestamp,omitempty"` // Unix timestamp in milliseconds
+	Message   AxisNotificationMessage `json:"message,omitempty"`
+}
+
 type AxisEventParams struct {
-	EventFilterList []AxisEventFilter `json:"eventFilterList"`
+	EventFilterList []AxisEventFilter `json:"eventFilterList,omitempty"`
+	Notification    AxisNotification  `json:"notification,omitempty"`
 }
 
 type AxisEvent struct {
@@ -164,14 +177,28 @@ func (cam *AxisCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter)
 		log.Debugf("eventFilter: %+v\n", eventFilter)
 		c.WriteJSON(eventFilter)
 		for {
-			mt, message, err := c.ReadMessage()
+			_, message, err := c.ReadMessage()
 			if err != nil {
-				log.Info("Error from WS stream:", err)
+				log.Error("Error from WS stream:", err)
 				close(messages)
 				break
 			}
+			exisEvent := AxisEvent{}
+			err = json.Unmarshal(message, &exisEvent)
+			if err != nil {
+				log.Info("Error parsing JSON from Axis WS stream:", err)
+				continue
+			}
+
+			cameraEvent := CameraEvent{
+				CoreType:  "notification",
+				Type:      "CamMotionDetected",
+				Source:    "cam:axis:name",
+				Topic:     exisEvent.Params.Notification.Topic,
+				Timestamp: exisEvent.Params.Notification.Timestamp,
+				RawData:   message}
 			select {
-			case messages <- CameraEvent{Data: message, Type: fmt.Sprint(mt)}:
+			case messages <- cameraEvent:
 				// Message sent successfully
 			default:
 				// Channel is full, message not sent
@@ -182,3 +209,20 @@ func (cam *AxisCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter)
 	}()
 	return messages, nil
 }
+
+/*
+Usefull topic :
+
+            {
+              "TopicFilter": "tnsaxis:CameraApplicationPlatform/FenceGuard/xinternal_data"
+},
+            {
+              "TopicFilter": "tns1:Device/tnsaxis:IO/Port"
+            }
+
+Fence events
+
+ {\"apiVersion\":\"1.0\",\"method\":\"events:notify\",\"params\":{\"notification\":{\"topic\":\"tnsaxis:CameraApplicationPlatform/FenceGuard/Camera1Profile1\",\"timestamp\":1710752405172,\"message\":{\"source\":{},\"key\":{},\"data\":{\"active\":\"1\"}}}}}"
+ {\"apiVersion\":\"1.0\",\"method\":\"events:notify\",\"params\":{\"notification\":{\"topic\":\"tnsaxis:CameraApplicationPlatform/FenceGuard/Camera1Profile1\",\"timestamp\":1710752408371,\"message\":{\"source\":{},\"key\":{},\"data\":{\"active\":\"0\"}}}}}
+
+*/
