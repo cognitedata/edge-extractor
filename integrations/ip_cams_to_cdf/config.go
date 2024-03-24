@@ -48,7 +48,8 @@ func (c *CameraConfig) IsEqual(other *CameraConfig) bool {
 }
 
 type IntegrationConfig struct {
-	Cameras []CameraConfig
+	Cameras             []CameraConfig
+	DisableRunReporting bool
 }
 
 // Compare CameraImagesToCdfConfig with another CameraImagesToCdfConfig

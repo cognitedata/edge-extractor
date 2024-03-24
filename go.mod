@@ -1,11 +1,13 @@
 module github.com/cognitedata/edge-extractor
 
-go 1.17
+go 1.21
 
 require (
 	github.com/cognitedata/cognite-sdk-go v0.3.2-0.20211022150037-c6aa1283f946
 	github.com/sirupsen/logrus v1.6.0
 )
+
+require github.com/cskr/pubsub/v2 v2.0.1 // indirect
 
 require (
 	github.com/golang/protobuf v1.4.3 // indirect

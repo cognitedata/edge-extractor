@@ -7,6 +7,9 @@ github.com/cognitedata/cognite-sdk-go/pkg/cognite/api/iam
 github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto
 github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core
 github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/iam
+# github.com/cskr/pubsub/v2 v2.0.1
+## explicit; go 1.18
+github.com/cskr/pubsub/v2
 # github.com/golang/protobuf v1.4.3
 ## explicit; go 1.9
 github.com/golang/protobuf/proto

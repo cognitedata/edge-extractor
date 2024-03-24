@@ -11,6 +11,7 @@ import (
 	"github.com/cognitedata/edge-extractor/drivers/camera"
 	"github.com/cognitedata/edge-extractor/integrations"
 	"github.com/cognitedata/edge-extractor/internal"
+	"github.com/cskr/pubsub/v2"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -19,17 +20,25 @@ type CameraImagesToCdf struct {
 	successCounter    uint64
 	failureCounter    uint64
 	cameraConfigs     []CameraConfig
+	cameras           map[uint64]*inputs.IpCamera
 	secretManager     *internal.SecretManager
 	integrationConfig IntegrationConfig
+	eventbus          *pubsub.PubSub[string, camera.CameraEvent] // Replace T and M with the appropriate types
 }
 
 func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractorMonitoringID string, configObserver *internal.CdfConfigObserver) *CameraImagesToCdf {
+	eventBus := pubsub.New[string, camera.CameraEvent](20)
 	ingr := &CameraImagesToCdf{
 		BaseIntegration: *integrations.NewIntegration("ip_cams_to_cdf", cogClient, extractorMonitoringID, configObserver),
+		eventbus:        eventBus,
+		cameras:         make(map[uint64]*inputs.IpCamera),
 	}
 	return ingr
 }
 
+func (intgr *CameraImagesToCdf) GetEventBus() *pubsub.PubSub[string, camera.CameraEvent] {
+	return intgr.eventbus
+}
 func (intgr *CameraImagesToCdf) SetConfig(localConfig IntegrationConfig) {
 	intgr.cameraConfigs = localConfig.Cameras
 }
@@ -43,6 +52,7 @@ func (intgr *CameraImagesToCdf) LoadConfigFromJson(config json.RawMessage) error
 	}
 	intgr.cameraConfigs = localConfig.Cameras
 	intgr.integrationConfig = localConfig
+	intgr.BaseIntegration.DisableRunReporting(localConfig.DisableRunReporting)
 	log.Info("Local config has been loaded successfully. Cameras count = ", len(intgr.cameraConfigs))
 	return nil
 }
@@ -156,6 +166,7 @@ func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(cameraConfig Came
 		log.Error("Unsupported camera model")
 		return fmt.Errorf("unsupported camera model")
 	}
+	intgr.cameras[cameraConfig.ID] = cam
 	intgr.BaseIntegration.StateTracker.SetProcessorCurrentState(cameraConfig.ID, internal.ProcessorStateRunning)
 
 	cameraEventFilters := make([]camera.EventFilter, len(cameraConfig.EventFilters))
@@ -164,11 +175,11 @@ func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(cameraConfig Came
 	}
 
 	if cameraConfig.EnableCameraEventStream {
-		go intgr.StartSingleCameraEventsProcessingLoop(cameraConfig.Name, cam, cameraEventFilters)
+		go intgr.StartSingleCameraEventsProcessingLoop(cameraConfig.ID, cameraConfig.Name, cam, cameraEventFilters)
 	}
 	for {
 
-		intgr.executeProcessorRun(cameraConfig, cam)
+		intgr.executeProcessorRun(cameraConfig, cam, nil)
 
 		if !intgr.IsRunning {
 			break
@@ -193,7 +204,7 @@ func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(cameraConfig Came
 	return nil
 }
 
-func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(name string, camera *inputs.IpCamera, eventFilters []camera.EventFilter) error {
+func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(ID uint64, name string, camera *inputs.IpCamera, eventFilters []camera.EventFilter) error {
 	log.Infof("Starting camera events processor %s", name)
 	defer func() {
 		if r := recover(); r != nil {
@@ -209,8 +220,11 @@ func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(name strin
 	}
 	for event := range stream {
 		log.Infof("Received event from camera %s : %s", name, event.Type)
-		// log.Debugf("Event data : %s", string(event.RawData))
-		// log.Debugf("Time from Axis WS stream: %d", event.Timestamp)
+		log.Debugf("Event data : %s", string(event.RawData))
+		log.Debugf("Time from Axis WS stream: %d", event.Timestamp)
+		topic := fmt.Sprintf("%d/%s", ID, event.Topic)
+		intgr.eventbus.TryPub(event, topic)
+		log.Debugf("Event published to event bus. Topic : %s", topic)
 		cdfEvents := core.EventList{
 			core.Event{
 				StartTime:   event.Timestamp,
@@ -233,8 +247,29 @@ func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(name strin
 	return nil
 }
 
+// ExecuteProcessorRunByCameraID executes the processor run for a specific camera ID.
+// It retrieves the camera configuration and camera object based on the provided camera ID,
+// and then calls the executeProcessorRun function to perform the actual processing.
+// The metadata parameter is a map of additional information that can be passed to the processor.
+// WARNING: This function is blocking and should be run in its own goroutine to avoid blocking the main application.
+// Returns an error if any error occurs during the execution.
+func (intgr *CameraImagesToCdf) ExecuteProcessorRunByCameraID(cameraID uint64, metadata map[string]string) error {
+	camera := intgr.cameras[cameraID]
+	cameraConfig := intgr.GetCameraConfigByID(cameraID)
+	return intgr.executeProcessorRun(*cameraConfig, camera, metadata)
+}
+
+func (intgr *CameraImagesToCdf) GetCameraConfigByID(cameraID uint64) *CameraConfig {
+	for i := range intgr.cameraConfigs {
+		if intgr.cameraConfigs[i].ID == cameraID {
+			return &intgr.cameraConfigs[i]
+		}
+	}
+	return nil
+}
+
 // executeProcessorRun executes single processor run (full process) , the operation is blocking and must be started in its own goroute for low latency and high throughput
-func (intgr *CameraImagesToCdf) executeProcessorRun(camera CameraConfig, cam *inputs.IpCamera) error {
+func (intgr *CameraImagesToCdf) executeProcessorRun(camera CameraConfig, cam *inputs.IpCamera, metadata map[string]string) error {
 	defer func() {
 		if r := recover(); r != nil {
 			stack := string(debug.Stack())
@@ -259,7 +294,7 @@ func (intgr *CameraImagesToCdf) executeProcessorRun(camera CameraConfig, cam *in
 		timeStamp := time.Now().Format(time.RFC3339)
 		externalId := camera.Name + " " + timeStamp
 		fileName := externalId + ".jpeg"
-		err := intgr.BaseIntegration.CogClient.UploadInMemoryFile(img.Body, externalId, fileName, img.Format, camera.LinkedAssetID)
+		err := intgr.BaseIntegration.CogClient.UploadInMemoryFile(img.Body, externalId, fileName, img.Format, camera.LinkedAssetID, metadata)
 		if err != nil {
 			log.Debug("Can't upload image. Error : ", err.Error())
 			intgr.failureCounter++

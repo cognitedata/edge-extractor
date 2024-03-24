@@ -27,6 +27,7 @@ type StaticConfig struct {
 	LogDir               string
 
 	Integrations map[string]json.RawMessage // map of integration configs (key is integration name, value is integration config)
+	Apps         json.RawMessage            // map of app configs (key is app name, value is app config)
 	IsEncrypted  bool
 	Secrets      map[string]string // map of encrypted secrets (key is secret name, value is encrypted secret)
 }

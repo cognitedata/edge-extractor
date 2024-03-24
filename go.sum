@@ -42,6 +42,8 @@ github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGX
 github.com/cognitedata/cognite-sdk-go v0.3.2-0.20211022150037-c6aa1283f946 h1:3V+ILNTb/YWmD/qz9LaYLFL73KyOnQ+HXSzikgZDjdE=
 github.com/cognitedata/cognite-sdk-go v0.3.2-0.20211022150037-c6aa1283f946/go.mod h1:9K2xZ8ejXvSUssXDyDleBtRUJA283O515JnyWlIIJfk=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
+github.com/cskr/pubsub/v2 v2.0.1 h1:bNdoVicQCVDj9s3DUlMl+BfrUNbqcT/s7zl0lCNhYT0=
+github.com/cskr/pubsub/v2 v2.0.1/go.mod h1:XYuiN8dhcXTCzQDa5SH4+B3zLso94FTwAk0maAEGJJw=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

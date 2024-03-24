@@ -61,9 +61,9 @@ func (co *CdfClient) UploadFile(filePath, externalId, name, mimeType string, ass
 	return co.BasicUploadFileBody(filePath, name, mimeType, uploadUrl.UploadUrl)
 }
 
-func (co *CdfClient) UploadInMemoryFile(body []byte, externalId, name, mimeType string, assetId uint64) error {
+func (co *CdfClient) UploadInMemoryFile(body []byte, externalId, name, mimeType string, assetId uint64, metadata map[string]string) error {
 
-	fileMetadata := core.CreateFileMetadata{ExternalId: externalId, Name: name, MimeType: mimeType, DataSetId: co.dataSetId, Source: "edge-extractor"}
+	fileMetadata := core.CreateFileMetadata{ExternalId: externalId, Name: name, MimeType: mimeType, DataSetId: co.dataSetId, Source: "edge-extractor", Metadata: metadata}
 	if assetId != 0 {
 		fileMetadata.AssetIds = []uint64{assetId}
 	}

@@ -11,8 +11,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cognitedata/edge-extractor/apps/core"
 	"github.com/cognitedata/edge-extractor/integrations/ip_cams_to_cdf"
 	"github.com/cognitedata/edge-extractor/internal"
+	"github.com/cskr/pubsub/v2"
 	"github.com/kardianos/service"
 	log "github.com/sirupsen/logrus"
 )
@@ -29,6 +31,7 @@ type Integration interface {
 }
 
 var integrReg map[string]Integration
+var appManager *core.AppManager
 
 type program struct{}
 
@@ -212,6 +215,8 @@ func startEdgeExtractor(mainConfigPath string) {
 		configObserver.Start(config.ConfigReloadInterval * time.Second)
 	}
 
+	appManager = core.NewAppManager()
+
 	integrReg = make(map[string]Integration)
 
 	for _, integrName := range config.EnabledIntegrations {
@@ -227,7 +232,9 @@ func startEdgeExtractor(mainConfigPath string) {
 				log.Errorf(" %s integration can't be started . Error : %s", integrName, err.Error())
 			} else {
 				integrReg["ip_cams_to_cdf"] = intgr
+				appManager.SetIntegration("ip_cams_to_cdf", intgr)
 			}
+
 		case "local_files_to_cdf":
 			log.Info(" local_files_to_cdf integration not implemented yet")
 			// intgr := local_files_to_cdf.NewLocalFilesToCdf(cdfCLient, config.ExtractorID, config.RemoteConfigSource)
@@ -240,6 +247,12 @@ func startEdgeExtractor(mainConfigPath string) {
 			// }
 
 		}
+	}
+
+	err = appManager.LoadAppsFromRawConfig(config.Apps)
+	if err != nil {
+		log.Error("Failed to load apps. Err:", err.Error())
+		return
 	}
 }
 
@@ -364,6 +377,20 @@ func main() {
 	case "update":
 		log.Info("Updating edge-extractor service binary")
 		internal.UpdateLinuxServiceBinary()
+	case "event-bus":
+		log.Info("Starting event bus")
+		eventBus := pubsub.New[string, string](20)
+		topic := []string{"1/tnsaxis:CameraApplicationPlatform/FenceGuard/Camera1Profile1"}
+		stream := eventBus.Sub(topic...)
+		go func() {
+			for msg := range stream {
+				log.Info("Received message : ", msg)
+				break
+			}
+		}()
+		log.Info("Publishing message")
+		eventBus.TryPub("test", "1/tnsaxis:CameraApplicationPlatform/FenceGuard/Camera1Profile1")
+		select {}
 
 	case "run":
 		// Should be used to start service from CLI\
