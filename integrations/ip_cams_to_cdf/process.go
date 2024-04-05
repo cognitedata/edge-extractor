@@ -151,7 +151,7 @@ func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(cameraConfig Came
 	log.Infof("Non-default polling interval = %d", cameraConfig.PollingInterval)
 	pollingInterval = time.Duration(cameraConfig.PollingInterval) * time.Second
 
-	if pollingInterval < 1 {
+	if pollingInterval == 0 {
 		pollingInterval = 60 * time.Second
 	}
 
@@ -176,6 +176,10 @@ func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(cameraConfig Came
 
 	if cameraConfig.EnableCameraEventStream {
 		go intgr.StartSingleCameraEventsProcessingLoop(cameraConfig.ID, cameraConfig.Name, cam, cameraEventFilters)
+	}
+	if pollingInterval < 0 {
+		log.Infof("Polling interval is negative, processor %d will not run", cameraConfig.ID)
+		return nil
 	}
 	for {
 
@@ -225,14 +229,15 @@ func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(ID uint64,
 		topic := fmt.Sprintf("%d/%s", ID, event.Topic)
 		intgr.eventbus.TryPub(event, topic)
 		log.Debugf("Event published to event bus. Topic : %s", topic)
+		corellationID := fmt.Sprintf("%d", event.Timestamp)
 		cdfEvents := core.EventList{
 			core.Event{
 				StartTime:   event.Timestamp,
 				EndTime:     event.Timestamp,
-				Type:        event.CoreType,
-				Subtype:     event.Type,
+				Type:        event.Type,
+				Subtype:     event.CoreType,
 				Description: "",
-				Metadata:    map[string]string{"cameraName": name, "topic": event.Topic, "rawData": string(event.RawData)},
+				Metadata:    map[string]string{"cameraName": name, "eventCorrelationId": corellationID, "topic": event.Topic, "rawData": string(event.RawData)},
 				Source:      "edge-extractor:camera",
 			},
 		}
@@ -292,14 +297,14 @@ func (intgr *CameraImagesToCdf) executeProcessorRun(camera CameraConfig, cam *in
 		}
 
 		timeStamp := time.Now().Format(time.RFC3339)
-		externalId := camera.Name + " " + timeStamp
-		fileName := externalId + ".jpeg"
+		externalId := fmt.Sprintf("%s_%d", camera.Name, time.Now().UnixMilli())
+		fileName := camera.Name + " " + timeStamp + ".jpeg"
 		err := intgr.BaseIntegration.CogClient.UploadInMemoryFile(img.Body, externalId, fileName, img.Format, camera.LinkedAssetID, metadata)
 		if err != nil {
-			log.Debug("Can't upload image. Error : ", err.Error())
+			log.Error("Can't upload image. Error : ", err.Error())
 			intgr.failureCounter++
 			intgr.BaseIntegration.ReportRunStatus(camera.Name, core.ExtractionRunStatusFailure, fmt.Sprintf("failed to upload img, err :%s", err.Error()))
-			time.Sleep(time.Second * 60)
+			time.Sleep(time.Second * 15)
 		} else {
 			log.Debug("File uploaded to CDF successfully")
 			intgr.successCounter++

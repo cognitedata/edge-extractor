@@ -22,6 +22,16 @@ type AxisCameraDriver struct {
 	password        string
 }
 
+// TopicFilter is the filter for the event topic.
+// ContentFilter is the filter for the event content.
+/*
+Example of event filter for Axis camera:
+ "EventFilters": [
+            {
+              "TopicFilter": "tnsaxis:CameraApplicationPlatform/FenceGuard/Camera1Profile1",
+              "ContentFilter": "boolean(//SimpleItem[@Name=\"active\" and @Value=\"1\"])"
+            }
+*/
 type AxisEventFilter struct {
 	TopicFilter   string `json:"topicFilter,omitempty"`
 	ContentFilter string `json:"contentFilter,omitempty"`
@@ -189,7 +199,9 @@ func (cam *AxisCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter)
 				log.Info("Error parsing JSON from Axis WS stream:", err)
 				continue
 			}
-
+			if exisEvent.Method == "events:configure" {
+				continue
+			}
 			cameraEvent := CameraEvent{
 				CoreType:  "notification",
 				Type:      "CamMotionDetected",
