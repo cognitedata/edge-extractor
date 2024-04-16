@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core"
@@ -23,15 +24,17 @@ type CameraImagesToCdf struct {
 	cameras           map[uint64]*inputs.IpCamera
 	secretManager     *internal.SecretManager
 	integrationConfig IntegrationConfig
-	eventbus          *pubsub.PubSub[string, camera.CameraEvent] // Replace T and M with the appropriate types
+	eventbus          *pubsub.PubSub[string, camera.CameraEvent]
+	systemEventBus    *pubsub.PubSub[string, internal.SystemEvent]
 }
 
-func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractorMonitoringID string, configObserver *internal.CdfConfigObserver) *CameraImagesToCdf {
+func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractorMonitoringID string, configObserver *internal.CdfConfigObserver, systemEventBus *pubsub.PubSub[string, internal.SystemEvent]) *CameraImagesToCdf {
 	eventBus := pubsub.New[string, camera.CameraEvent](20)
 	ingr := &CameraImagesToCdf{
 		BaseIntegration: *integrations.NewIntegration("ip_cams_to_cdf", cogClient, extractorMonitoringID, configObserver),
 		eventbus:        eventBus,
 		cameras:         make(map[uint64]*inputs.IpCamera),
+		systemEventBus:  systemEventBus,
 	}
 	return ingr
 }
@@ -49,6 +52,12 @@ func (intgr *CameraImagesToCdf) LoadConfigFromJson(config json.RawMessage) error
 	if err != nil {
 		log.Error("Failed to unmarshal local config with error : ", err.Error())
 		return err
+	}
+	if localConfig.RetryCount == 0 {
+		localConfig.RetryCount = 3
+	}
+	if localConfig.RetryInterval == 0 {
+		localConfig.RetryInterval = 10
 	}
 	intgr.cameraConfigs = localConfig.Cameras
 	intgr.integrationConfig = localConfig
@@ -76,20 +85,32 @@ func (intgr *CameraImagesToCdf) Start() error {
 	} else {
 		log.Info("Starting processing loop using remote configurations")
 		configQueue := intgr.BaseIntegration.ConfigObserver.SubscribeToConfigUpdates(intgr.BaseIntegration.ID, &IntegrationConfig{})
+		var revision int = -1
 		go func() {
 			for configAction := range configQueue {
 				config := configAction.Config.(*IntegrationConfig)
 				// log.Debugf("Old config for ingration : %+v\n ", intgr.integrationConfig)
 				// log.Debugf("New config for ingration : %+v\n ", config)
+				if config == nil {
+					continue
+				}
+				if config.RetryCount == 0 {
+					config.RetryCount = 3
+				}
+				if config.RetryInterval == 0 {
+					config.RetryInterval = 10
+				}
 
-				if !intgr.integrationConfig.IsEqual(config) {
+				if !intgr.integrationConfig.IsEqual(config) || revision != configAction.Revision {
 					log.Info("Config has been changed . Restarting processors")
+					intgr.BaseIntegration.ReportRunStatus("", core.ExtractionRunStatusSuccess, "Config has been changed . Restarting processors")
 					// Stopping all processors
 					for _, camera := range intgr.cameraConfigs {
 						intgr.BaseIntegration.StopProcessor(camera.ID)
 					}
 					intgr.integrationConfig = config.Clone()
 					intgr.cameraConfigs = config.Cameras
+					revision = configAction.Revision
 					for _, camera := range intgr.cameraConfigs {
 						if camera.State == "enabled" {
 							go intgr.startSingleCameraProcessorLoop(camera)
@@ -110,9 +131,9 @@ func (intgr *CameraImagesToCdf) Start() error {
 func (intgr *CameraImagesToCdf) startSelfMonitoring() {
 	for {
 		if intgr.successCounter > 0 && intgr.failureCounter == 0 {
-			intgr.ReportRunStatus("", core.ExtractionRunStatusSuccess, "all cameras operational")
+			intgr.ReportRunStatus("", core.ExtractionRunStatusSuccess, fmt.Sprintf("Processed %d images", intgr.successCounter))
 		} else if intgr.successCounter > 0 && intgr.failureCounter > 0 {
-			intgr.ReportRunStatus("", core.ExtractionRunStatusSuccess, "some cameras not operational")
+			intgr.ReportRunStatus("", core.ExtractionRunStatusSuccess, fmt.Sprintf("Processed %d images, %d failures", intgr.successCounter, intgr.failureCounter))
 		} else {
 			intgr.ReportRunStatus("", core.ExtractionRunStatusSeen, "")
 		}
@@ -216,39 +237,53 @@ func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(ID uint64,
 			log.Error("startProcessor failed to start with error : ", stack)
 		}
 	}()
-
-	stream, err := camera.SubscribeToEventsStream(eventFilters)
-	if err != nil {
-		log.Errorf("Failed to subscribe to camera events stream. Error : %s", err.Error())
-		return err
-	}
-	for event := range stream {
-		log.Infof("Received event from camera %s : %s", name, event.Type)
-		log.Debugf("Event data : %s", string(event.RawData))
-		log.Debugf("Time from Axis WS stream: %d", event.Timestamp)
-		topic := fmt.Sprintf("%d/%s", ID, event.Topic)
-		intgr.eventbus.TryPub(event, topic)
-		log.Debugf("Event published to event bus. Topic : %s", topic)
-		corellationID := fmt.Sprintf("%d", event.Timestamp)
-		cdfEvents := core.EventList{
-			core.Event{
-				StartTime:   event.Timestamp,
-				EndTime:     event.Timestamp,
-				Type:        event.Type,
-				Subtype:     event.CoreType,
-				Description: "",
-				Metadata:    map[string]string{"cameraName": name, "eventCorrelationId": corellationID, "topic": event.Topic, "rawData": string(event.RawData)},
-				Source:      "edge-extractor:camera",
-			},
-		}
-		_, err := intgr.CogClient.Client().Events.Create(cdfEvents)
+	retryCount := 0
+	for {
+		stream, err := camera.SubscribeToEventsStream(eventFilters)
 		if err != nil {
-			log.Errorf("Failed to publish event to CDF. Error : %s", err.Error())
-			continue
+			retryCount++
+			if retryCount > intgr.integrationConfig.RetryCount*10 {
+				log.Errorf("Failed to subscribe to camera events stream %s after %d retries", name, intgr.integrationConfig.RetryCount)
+				intgr.BaseIntegration.ReportRunStatus(name, core.ExtractionRunStatusFailure, fmt.Sprintf("extractor disconnected from event stream after %d retries. Camera name: %s ", intgr.integrationConfig.RetryCount, name))
+				return err
+			} else {
+				log.Infof("Lost connection to camera %s event stream. Reconnecting ...", name)
+				intgr.BaseIntegration.ReportRunStatus(name, core.ExtractionRunStatusFailure, fmt.Sprintf("Lost connection to camera %s event stream. Reconnecting ...", name))
+				time.Sleep(time.Second * time.Duration(intgr.integrationConfig.RetryInterval))
+				continue
+			}
 		}
-
+		intgr.BaseIntegration.ReportRunStatus(name, core.ExtractionRunStatusSuccess, fmt.Sprintf("Connected to camera event stream.Camera name : %s", name))
+		for event := range stream {
+			log.Infof("Received event from camera %s : %s", name, event.Type)
+			log.Debugf("Event data : %s", string(event.RawData))
+			log.Debugf("Time from Axis WS stream: %d", event.Timestamp)
+			topic := fmt.Sprintf("%d/%s", ID, event.Topic)
+			intgr.eventbus.TryPub(event, topic)
+			log.Debugf("Event published to event bus. Topic : %s", topic)
+			corellationID := fmt.Sprintf("%d", event.Timestamp)
+			cdfEvents := core.EventList{
+				core.Event{
+					StartTime:   event.Timestamp,
+					EndTime:     event.Timestamp + 1,
+					Type:        event.Type,
+					Subtype:     event.CoreType,
+					Description: "",
+					Metadata:    map[string]string{"cameraName": name, "cameraId": fmt.Sprint(ID), "eventCorrelationId": corellationID, "topic": event.Topic, "rawData": string(event.RawData)},
+					Source:      "edge-extractor:camera",
+				},
+			}
+			_, err := intgr.CogClient.Client().Events.Create(cdfEvents)
+			if err != nil {
+				log.Errorf("Failed to publish event to CDF. Error : %s", err.Error())
+				continue
+			}
+		}
+		log.Infof("Camera events stream processor %s exited main loop. ", name)
+		if !intgr.IsRunning {
+			break
+		}
 	}
-	log.Infof("Camera events stream processor %s exited main loop ", name)
 	return nil
 }
 
@@ -286,28 +321,42 @@ func (intgr *CameraImagesToCdf) executeProcessorRun(camera CameraConfig, cam *in
 
 	img, err := cam.ExtractImage()
 	if err != nil {
-		log.Debugf("Can't extract image from camera  %s  . Error : %s", camera.Name, err.Error())
+		log.Errorf("Can't extract image from camera  %s  . Error : %s", camera.Name, err.Error())
 		intgr.failureCounter++
 		intgr.BaseIntegration.ReportRunStatus(camera.Name, core.ExtractionRunStatusFailure, fmt.Sprintf("failed to extract img, err :%s", err.Error()))
-		time.Sleep(time.Second * 60)
+		time.Sleep(time.Second * 20)
 	} else {
 		if img == nil {
-			time.Sleep(time.Second * 10)
+			time.Sleep(time.Second * 1)
 			return nil
 		}
 
-		timeStamp := time.Now().Format(time.RFC3339)
-		externalId := fmt.Sprintf("%s_%d", camera.Name, time.Now().UnixMilli())
+		timeStamp := time.Now().Format("2006-01-02T15:04:05.999")
+		externalId := fmt.Sprintf("%s_%d", camera.Name, time.Now().UnixNano())
 		fileName := camera.Name + " " + timeStamp + ".jpeg"
-		err := intgr.BaseIntegration.CogClient.UploadInMemoryFile(img.Body, externalId, fileName, img.Format, camera.LinkedAssetID, metadata)
-		if err != nil {
-			log.Error("Can't upload image. Error : ", err.Error())
-			intgr.failureCounter++
-			intgr.BaseIntegration.ReportRunStatus(camera.Name, core.ExtractionRunStatusFailure, fmt.Sprintf("failed to upload img, err :%s", err.Error()))
-			time.Sleep(time.Second * 15)
-		} else {
-			log.Debug("File uploaded to CDF successfully")
-			intgr.successCounter++
+		retryCount := 0
+		for {
+			err := intgr.BaseIntegration.CogClient.UploadInMemoryFile(img.Body, externalId, fileName, img.Format, camera.LinkedAssetID, metadata)
+			if err != nil {
+				if strings.Contains(err.Error(), "Duplicate external ids") {
+					log.Info("Duplicate external ids error. Errror ignored. Error : ", err.Error())
+					intgr.successCounter++
+					break
+				} else {
+					log.Error("Failed to upload image to CDF. Error : ", err.Error())
+				}
+				intgr.failureCounter++
+				intgr.BaseIntegration.ReportRunStatus(camera.Name, core.ExtractionRunStatusFailure, fmt.Sprintf("failed to upload img, err :%s", err.Error()))
+				retryCount++
+				if !intgr.IsRunning || retryCount > intgr.integrationConfig.RetryCount {
+					break
+				}
+				time.Sleep(time.Second * time.Duration(intgr.integrationConfig.RetryInterval*retryCount))
+			} else {
+				log.Debug("File uploaded to CDF successfully")
+				intgr.successCounter++
+				break
+			}
 		}
 	}
 	return err

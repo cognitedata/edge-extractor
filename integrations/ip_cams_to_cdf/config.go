@@ -49,6 +49,8 @@ func (c *CameraConfig) IsEqual(other *CameraConfig) bool {
 
 type IntegrationConfig struct {
 	Cameras             []CameraConfig
+	RetryCount          int
+	RetryInterval       int
 	DisableRunReporting bool
 }
 

@@ -136,10 +136,10 @@ func (cam *AxisCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter)
 	digestRequest := edgedac.NewRequest(cam.username, cam.password, "GET", digestAddress, "")
 	address := strings.Replace(cam.address, "http", "ws", 1) + "/vapix/ws-data-stream?sources=events"
 
-	log.Debug("Connecting to camera websocket at ", address)
+	log.Info("Connecting to Axis camera event stream over WS. Address : ", address)
 	var authHeader string
 	c, resp, err := websocket.DefaultDialer.Dial(address, nil)
-	if resp.StatusCode == 401 {
+	if resp != nil && resp.StatusCode == 401 {
 		authHeader, err = digestRequest.GetNewDigestAuthHeaderFromResponse(resp)
 		if err != nil {
 			log.Error("Error getting new digest auth header:", err)
@@ -168,58 +168,62 @@ func (cam *AxisCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter)
 
 	messages := make(chan CameraEvent, 10)
 	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Info("Recovered from panic:", r)
-				log.Info("Disconnected from camera websocket.")
-			}
-			defer c.Close()
-		}()
-		log.Info("Connected to camera websocket and subscribed to events.")
-		eventFilter := AxisEvent{
-			APIVersion: "1.0",
-			Context:    "edge-extractor event subscription",
-			Method:     "events:configure",
-			Params: AxisEventParams{
-				EventFilterList: axisEventFilterList,
-			},
-		}
-		log.Debugf("eventFilter: %+v\n", eventFilter)
-		c.WriteJSON(eventFilter)
-		for {
-			_, message, err := c.ReadMessage()
-			if err != nil {
-				log.Error("Error from WS stream:", err)
-				close(messages)
-				break
-			}
-			exisEvent := AxisEvent{}
-			err = json.Unmarshal(message, &exisEvent)
-			if err != nil {
-				log.Info("Error parsing JSON from Axis WS stream:", err)
-				continue
-			}
-			if exisEvent.Method == "events:configure" {
-				continue
-			}
-			cameraEvent := CameraEvent{
-				CoreType:  "notification",
-				Type:      "CamMotionDetected",
-				Source:    "cam:axis:name",
-				Topic:     exisEvent.Params.Notification.Topic,
-				Timestamp: exisEvent.Params.Notification.Timestamp,
-				RawData:   message}
-			select {
-			case messages <- cameraEvent:
-				// Message sent successfully
-			default:
-				// Channel is full, message not sent
-				log.Info("Channel is full, message not sent")
-			}
-		}
-		log.Info("Disconnected from camera websocket.")
+		cam.wsMessageHandler(c, axisEventFilterList, messages)
 	}()
 	return messages, nil
+}
+
+func (*AxisCameraDriver) wsMessageHandler(c *websocket.Conn, axisEventFilterList []AxisEventFilter, messages chan CameraEvent) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Info("Recovered from panic:", r)
+			log.Info("Disconnected from camera websocket.")
+		}
+		defer c.Close()
+	}()
+	log.Info("Connected to camera websocket and subscribed to events.")
+	eventFilter := AxisEvent{
+		APIVersion: "1.0",
+		Context:    "edge-extractor event subscription",
+		Method:     "events:configure",
+		Params: AxisEventParams{
+			EventFilterList: axisEventFilterList,
+		},
+	}
+	log.Debugf("eventFilter: %+v\n", eventFilter)
+	c.WriteJSON(eventFilter)
+	for {
+		_, message, err := c.ReadMessage()
+		if err != nil {
+			log.Error("Error from WS stream:", err)
+			close(messages)
+			break
+		}
+		exisEvent := AxisEvent{}
+		err = json.Unmarshal(message, &exisEvent)
+		if err != nil {
+			log.Info("Error parsing JSON from Axis WS stream:", err)
+			continue
+		}
+		if exisEvent.Method == "events:configure" {
+			continue
+		}
+		cameraEvent := CameraEvent{
+			CoreType:  "notification",
+			Type:      "CamMotionDetected",
+			Source:    "cam:axis:name",
+			Topic:     exisEvent.Params.Notification.Topic,
+			Timestamp: exisEvent.Params.Notification.Timestamp,
+			RawData:   message}
+		select {
+		case messages <- cameraEvent:
+
+		default:
+
+			log.Info("Channel is full, message not sent")
+		}
+	}
+	log.Info("Disconnected from camera websocket.")
 }
 
 /*

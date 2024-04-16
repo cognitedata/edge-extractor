@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core"
 	"github.com/cognitedata/edge-extractor/drivers/camera"
 	"github.com/cognitedata/edge-extractor/integrations/ip_cams_to_cdf"
 	log "github.com/sirupsen/logrus"
@@ -51,6 +52,7 @@ func (app *CameraEventBasedCaptureApp) ConfigureFromRaw(configRaw json.RawMessag
 		config.MaxParallelWorkers = 1
 	}
 	app.config = config
+	log.Infof("CameraEventBasedCaptureApp configured with: %+v", app.config)
 	return nil
 }
 
@@ -89,7 +91,7 @@ func (app *CameraEventBasedCaptureApp) Start() error {
 		app.lastEvent = event
 		app.totalElapsedProcessingTimeSec = 0 // reset the total elapsed processing timer
 		if !app.isLoopRunning {
-			go app.startImageCaptureLoop()
+			go app.startEventImageCaptureLoop()
 		}
 		app.mux.Unlock()
 	}
@@ -97,45 +99,47 @@ func (app *CameraEventBasedCaptureApp) Start() error {
 	return nil
 }
 
-// startImageCaptureLoop is a method of the CameraEventBasedCaptureApp struct that starts the image capture loop.
+// startEventImageCaptureLoop is a method of the CameraEventBasedCaptureApp struct that starts the image capture loop.
 // It captures images for the duration specified in CaptureDurationSec or until the next event occurs, or until the app is stopped.
 // The method runs each image capture task in a separate worker, up to the maximum number of parallel workers specified in MaxParallelWorkers.
 // It updates the total elapsed processing time and logs the progress.
 // Once the capture duration is reached, the method finishes and logs the total elapsed time.
-func (app *CameraEventBasedCaptureApp) startImageCaptureLoop() {
+func (app *CameraEventBasedCaptureApp) startEventImageCaptureLoop() {
 	app.isLoopRunning = true
 	defer func() {
 		app.mux.Lock()
 		app.isLoopRunning = false
 		app.mux.Unlock()
 	}()
-	app.log.Debug("Starting image capture loop")
+	app.log.Info("Starting image capture loop...")
 	// capture images for the duration of CaptureDurationSec or until next event
 	// or until the app is stopped
 	for {
-		metadata := map[string]string{
-			"eventCorrelationId": strconv.FormatInt(app.lastEvent.Timestamp, 10),
-		}
+		// imageSyncID is used to correlate images captured from different cameras
+		imageSyncID := time.Now().UnixNano()
 		for _, cameraID := range app.config.ListOfTargetCameras {
 			if app.activeWorkers >= app.config.MaxParallelWorkers {
 				app.log.Warnf("Max parallel workers reached. Waiting...")
+				app.integration.BaseIntegration.ReportRunStatus("", core.ExtractionRunStatusFailure, "Max parallel workers reached for app CameraEventBasedCaptureApp. Waiting...")
 				for app.activeWorkers >= app.config.MaxParallelWorkers {
 					time.Sleep(500 * time.Millisecond)
 				}
 				app.log.Info("Resuming...")
 			}
+
 			// Running each image capture task in a separate worker
 			go func(id uint64) {
 				app.activeWorkers++
-				for i := 0; i < 3; i++ {
-					err := app.integration.ExecuteProcessorRunByCameraID(id, metadata)
-					if err == nil {
-						if i > 0 {
-							app.log.Infof("Successfully captured and uploaded image from camera %d after %d retries", id, i)
-						}
-						break
-					}
-					app.log.Infof("Failed to capture and upload image from camera %d. Retrying...", id)
+				metadata := map[string]string{
+					"eventCorrelationId": strconv.FormatInt(app.lastEvent.Timestamp, 10),
+					"cameraId":           strconv.FormatUint(id, 10),
+					"imageSyncId":        strconv.FormatInt(imageSyncID, 10),
+				}
+				err := app.integration.ExecuteProcessorRunByCameraID(id, metadata)
+				if err == nil {
+					app.log.Debugf("Successfully captured and uploaded image from camera %d", id)
+				} else {
+					app.log.Errorf("Failed to capture and upload image from camera %d.", id)
 				}
 				app.activeWorkers--
 			}(cameraID)
@@ -146,10 +150,11 @@ func (app *CameraEventBasedCaptureApp) startImageCaptureLoop() {
 		if app.totalElapsedProcessingTimeSec >= float64(app.config.CaptureDurationSec) {
 			break
 		}
-		app.log.Debugf("Total elapsed time: %d sec. Active workers %d", int(app.totalElapsedProcessingTimeSec), app.activeWorkers)
-		// sleep for DelayBetweenCapture
-		time.Sleep(time.Duration(app.config.DelayBetweenCapture) * time.Second)
+		delay := time.Duration(app.config.DelayBetweenCapture * 1000)
+		app.log.Infof("Total elapsed time: %d sec , delay %d milisec. Active workers %d", int(app.totalElapsedProcessingTimeSec), delay, app.activeWorkers)
+		time.Sleep(delay * time.Millisecond)
 	}
+	app.log.Infof("Event processed in %d sec", int(app.totalElapsedProcessingTimeSec))
 }
 
 func (app *CameraEventBasedCaptureApp) Stop() error {

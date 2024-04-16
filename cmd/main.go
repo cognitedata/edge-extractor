@@ -215,14 +215,16 @@ func startEdgeExtractor(mainConfigPath string) {
 		configObserver.Start(config.ConfigReloadInterval * time.Second)
 	}
 
-	appManager = core.NewAppManager()
+	systemEventBus := pubsub.New[string, internal.SystemEvent](20)
+
+	appManager = core.NewAppManager(systemEventBus)
 
 	integrReg = make(map[string]Integration)
 
 	for _, integrName := range config.EnabledIntegrations {
 		switch integrName {
 		case "ip_cams_to_cdf":
-			intgr := ip_cams_to_cdf.NewCameraImagesToCdf(cdfCLient, config.ExtractorID, configObserver)
+			intgr := ip_cams_to_cdf.NewCameraImagesToCdf(cdfCLient, config.ExtractorID, configObserver, systemEventBus)
 			intgr.SetSecretManager(secretManager)
 			if config.RemoteConfigSource == internal.ConfigSourceLocal {
 				intgr.LoadConfigFromJson(config.Integrations["ip_cams_to_cdf"])

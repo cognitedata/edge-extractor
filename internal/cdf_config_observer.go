@@ -32,9 +32,10 @@ type CdfConfigObserver struct {
 }
 
 type ConfigAction struct {
-	Name   int
-	Config interface{}
-	ProcId uint64
+	Name     int
+	Config   interface{}
+	ProcId   uint64
+	Revision int
 }
 
 type ConfigActionQueue chan ConfigAction
@@ -126,7 +127,7 @@ func (intgr *CdfConfigObserver) reloadRemoteConfigs() error {
 				}
 
 				select {
-				case intgr.configUpdatesQueue[integrationNameFromRemote] <- ConfigAction{Name: NewConfigAction, Config: integrConfig}:
+				case intgr.configUpdatesQueue[integrationNameFromRemote] <- ConfigAction{Name: NewConfigAction, Config: integrConfig, Revision: remoteConfig.Revision}:
 				default:
 					log.Warnf("Config action queue for processor %s is full", integrationNameFromRemote)
 				}
