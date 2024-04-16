@@ -100,3 +100,6 @@ func (cam *HikvisionCameraDriver) Commit(transactionId string) error {
 func (cam *HikvisionCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error) {
 	return nil, fmt.Errorf("hikvision camera driver does not support event streaming")
 }
+
+func (cam *HikvisionCameraDriver) Close() {
+}

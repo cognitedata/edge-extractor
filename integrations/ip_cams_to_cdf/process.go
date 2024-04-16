@@ -25,7 +25,6 @@ type CameraImagesToCdf struct {
 	secretManager     *internal.SecretManager
 	integrationConfig IntegrationConfig
 	eventbus          *pubsub.PubSub[string, camera.CameraEvent]
-	systemEventBus    *pubsub.PubSub[string, internal.SystemEvent]
 }
 
 func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractorMonitoringID string, configObserver *internal.CdfConfigObserver, systemEventBus *pubsub.PubSub[string, internal.SystemEvent]) *CameraImagesToCdf {
@@ -34,7 +33,6 @@ func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractorMonitoringID s
 		BaseIntegration: *integrations.NewIntegration("ip_cams_to_cdf", cogClient, extractorMonitoringID, configObserver),
 		eventbus:        eventBus,
 		cameras:         make(map[uint64]*inputs.IpCamera),
-		systemEventBus:  systemEventBus,
 	}
 	return ingr
 }
@@ -73,58 +71,38 @@ func (intgr *CameraImagesToCdf) SetSecretManager(secretManager *internal.SecretM
 func (intgr *CameraImagesToCdf) Start() error {
 	intgr.IsRunning = true
 	if intgr.cameraConfigs != nil && len(intgr.cameraConfigs) > 0 {
-		log.Info("Starting processing loop using local configurations")
-		for _, camera := range intgr.cameraConfigs {
-			if camera.State == "enabled" {
-				go intgr.startSingleCameraProcessorLoop(camera)
-			} else {
-				log.Infof("Camera %s is disabled , operation skipped", camera.Name)
-			}
-		}
+		intgr.startAllProcessors()
 
 	} else {
 		log.Info("Starting processing loop using remote configurations")
-		configQueue := intgr.BaseIntegration.ConfigObserver.SubscribeToConfigUpdates(intgr.BaseIntegration.ID, &IntegrationConfig{})
-		var revision int = -1
+		configQueue := intgr.BaseIntegration.ConfigObserver.SubscribeToIntegrationConfigUpdates(intgr.BaseIntegration.ID)
 		go func() {
 			for configAction := range configQueue {
-				config := configAction.Config.(*IntegrationConfig)
 				// log.Debugf("Old config for ingration : %+v\n ", intgr.integrationConfig)
 				// log.Debugf("New config for ingration : %+v\n ", config)
-				if config == nil {
-					continue
-				}
-				if config.RetryCount == 0 {
-					config.RetryCount = 3
-				}
-				if config.RetryInterval == 0 {
-					config.RetryInterval = 10
-				}
-
-				if !intgr.integrationConfig.IsEqual(config) || revision != configAction.Revision {
-					log.Info("Config has been changed . Restarting processors")
-					intgr.BaseIntegration.ReportRunStatus("", core.ExtractionRunStatusSuccess, "Config has been changed . Restarting processors")
-					// Stopping all processors
-					for _, camera := range intgr.cameraConfigs {
-						intgr.BaseIntegration.StopProcessor(camera.ID)
-					}
-					intgr.integrationConfig = config.Clone()
-					intgr.cameraConfigs = config.Cameras
-					revision = configAction.Revision
-					for _, camera := range intgr.cameraConfigs {
-						if camera.State == "enabled" {
-							go intgr.startSingleCameraProcessorLoop(camera)
-						} else {
-							log.Infof("Camera %s is disabled , operation skipped", camera.Name)
-						}
-
-					}
-				}
+				log.Info("Config has been changed . Restarting processors")
+				intgr.BaseIntegration.ReportRunStatus("", core.ExtractionRunStatusSuccess, "Config has been changed . Restarting processors")
+				// Stopping all processors
+				intgr.StopAndClean()
+				intgr.LoadConfigFromJson(configAction.Config)
+				intgr.startAllProcessors()
 			}
 		}()
 	}
 	go intgr.startSelfMonitoring()
 	return nil
+}
+
+func (intgr *CameraImagesToCdf) startAllProcessors() {
+	log.Info("Starting all camera processors")
+	for _, camera := range intgr.cameraConfigs {
+		if camera.State == "enabled" {
+			go intgr.startSingleCameraProcessorLoop(camera)
+		} else {
+			log.Infof("Camera %s is disabled , operation skipped", camera.Name)
+		}
+	}
+	log.Info("All camera processors have been started")
 }
 
 // startSelfMonitoring run a status reporting look that periodically sends status reports to pipeline monitoring
@@ -229,6 +207,17 @@ func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(cameraConfig Came
 	return nil
 }
 
+// StartSingleCameraEventsProcessingLoop starts a loop to process events from a single camera.
+// It subscribes to the events stream of the specified camera and publishes the events to the event bus and CDF.
+// The loop continues until the IsRunning flag is set to false or an error occurs.
+// Parameters:
+//   - ID: The ID of the camera.
+//   - name: The name of the camera.
+//   - camera: The IP camera object.
+//   - eventFilters: The filters to apply to the events stream.
+//
+// Returns:
+//   - error: An error if the subscription to the events stream fails or if there is an error publishing the events to CDF.
 func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(ID uint64, name string, camera *inputs.IpCamera, eventFilters []camera.EventFilter) error {
 	log.Infof("Starting camera events processor %s", name)
 	defer func() {
@@ -382,4 +371,17 @@ func (intgr *CameraImagesToCdf) executeCameraMetadataProcessorRun(camera CameraC
 		log.Info("Failed to extract metadata . Err :", err.Error())
 	}
 	return err
+}
+
+func (intgr *CameraImagesToCdf) StopAndClean() error {
+	intgr.IsRunning = false
+	log.Info("Stopping all camera processors")
+	for ID, camera := range intgr.cameras {
+		camera.Close()
+		intgr.BaseIntegration.StopProcessor(ID)
+		delete(intgr.cameras, ID)
+	}
+	log.Info("All camera processors have been stopped")
+
+	return nil
 }

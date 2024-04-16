@@ -107,3 +107,6 @@ func (cam *FlirAx8CameraDriver) Commit(transactionId string) error {
 func (cam *FlirAx8CameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error) {
 	return nil, fmt.Errorf("FlirAx8 camera does not support event streaming")
 }
+
+func (cam *FlirAx8CameraDriver) Close() {
+}

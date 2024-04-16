@@ -5,7 +5,6 @@ import (
 
 	"github.com/cognitedata/edge-extractor/apps/lib"
 	"github.com/cognitedata/edge-extractor/internal"
-	"github.com/cskr/pubsub/v2"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,17 +17,14 @@ type AppConfiguration struct {
 type AppManager struct {
 	Apps           map[string]lib.AppInstance
 	Integrations   map[string]interface{}
-	systemEventBus *pubsub.PubSub[string, internal.SystemEvent]
+	ConfigObserver *internal.CdfConfigObserver
 }
 
-func NewAppManager(systemEventBus *pubsub.PubSub[string, internal.SystemEvent]) *AppManager {
+func NewAppManager(configObserver *internal.CdfConfigObserver) *AppManager {
 	appManager := &AppManager{
 		Apps:           make(map[string]lib.AppInstance),
 		Integrations:   make(map[string]interface{}),
-		systemEventBus: systemEventBus,
-	}
-	if systemEventBus != nil {
-		go appManager.runSystemEventsHandler()
+		ConfigObserver: configObserver,
 	}
 	return appManager
 }
@@ -37,22 +33,18 @@ func (am *AppManager) SetIntegration(name string, integration interface{}) {
 	am.Integrations[name] = integration
 }
 
-func (am *AppManager) runSystemEventsHandler() {
-	for event := range am.systemEventBus.Sub("system/configs_updated") {
-		log.Infof("New system event received: %v", event.EventType)
-		newConfig, ok := event.Payload.(json.RawMessage)
-		if !ok {
-			log.Errorf("Failed to convert payload to json.RawMessage")
-			continue
+func (am *AppManager) startConfigHandler() {
+	log.Info("Starting processing loop using remote configurations")
+	configQueue := am.ConfigObserver.SubscribeToAppsConfigUpdates()
+	go func() {
+		for configAction := range configQueue {
+			log.Infof("Received new application config.Restarting apps")
+			am.StopApps()
+			am.LoadAppsFromRawConfig(configAction.Config)
+			log.Info("Apps restarted")
 		}
-		am.StopApps()
-		err := am.LoadAppsFromRawConfig(newConfig)
-		if err != nil {
-			log.Errorf("Failed to load apps from raw config: %v", err)
-			continue
-		}
-		log.Infof("Apps reloaded successfully")
-	}
+	}()
+
 }
 
 func (am *AppManager) LoadAppsFromRawConfig(configs json.RawMessage) error {
@@ -87,6 +79,10 @@ func (am *AppManager) LoadAppsFromRawConfig(configs json.RawMessage) error {
 	}
 
 	return nil
+}
+
+func (am *AppManager) StartApps() {
+	go am.startConfigHandler()
 }
 
 func (am *AppManager) StopApps() {

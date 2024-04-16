@@ -75,3 +75,9 @@ func (cam *IpCamera) Commit(transactionId string) error {
 func (cam *IpCamera) GetDriver() camera.Driver {
 	return cam.driver
 }
+
+func (cam *IpCamera) Close() {
+	if cam.driver != nil {
+		cam.driver.Close()
+	}
+}

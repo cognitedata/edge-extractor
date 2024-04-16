@@ -201,7 +201,7 @@ func startEdgeExtractor(mainConfigPath string) {
 
 	configureLogger(config.LogDir, config.LogLevel)
 
-	log.Info("Starting edge-extractor service.")
+	log.Info("Starting edge-extractor service. Version : ", Version)
 	secretManager := internal.NewSecretManager(EncryptionKey)
 	secretManager.LoadEncryptedSecrets(config.Secrets)
 	clientSecret := secretManager.GetSecret(config.Secret)
@@ -217,7 +217,7 @@ func startEdgeExtractor(mainConfigPath string) {
 
 	systemEventBus := pubsub.New[string, internal.SystemEvent](20)
 
-	appManager = core.NewAppManager(systemEventBus)
+	appManager = core.NewAppManager(configObserver)
 
 	integrReg = make(map[string]Integration)
 

@@ -91,3 +91,6 @@ func (cam *DahuaCameraDriver) Commit(transactionId string) error {
 func (cam *DahuaCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error) {
 	return nil, fmt.Errorf("DaHua camera does not support event streaming")
 }
+
+func (cam *DahuaCameraDriver) Close() {
+}

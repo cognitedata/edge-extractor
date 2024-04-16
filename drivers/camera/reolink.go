@@ -75,3 +75,6 @@ func (cam *ReolinkCameraDriver) Commit(transactionId string) error {
 func (cam *ReolinkCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error) {
 	return nil, fmt.Errorf("reolink camera does not support event streams")
 }
+
+func (cam *ReolinkCameraDriver) Close() {
+}

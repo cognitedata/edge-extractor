@@ -106,3 +106,6 @@ func (cam *FileSystemCameraDriver) Commit(transactionId string) error {
 func (cam *FileSystemCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error) {
 	return nil, fmt.Errorf("file system camera driver does not support event streaming")
 }
+
+func (cam *FileSystemCameraDriver) Close() {
+}

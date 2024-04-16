@@ -20,6 +20,7 @@ type AxisCameraDriver struct {
 	address         string
 	username        string
 	password        string
+	wsConnection    *websocket.Conn
 }
 
 // TopicFilter is the filter for the event topic.
@@ -138,7 +139,8 @@ func (cam *AxisCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter)
 
 	log.Info("Connecting to Axis camera event stream over WS. Address : ", address)
 	var authHeader string
-	c, resp, err := websocket.DefaultDialer.Dial(address, nil)
+	var resp *http.Response
+	cam.wsConnection, resp, err = websocket.DefaultDialer.Dial(address, nil)
 	if resp != nil && resp.StatusCode == 401 {
 		authHeader, err = digestRequest.GetNewDigestAuthHeaderFromResponse(resp)
 		if err != nil {
@@ -147,7 +149,7 @@ func (cam *AxisCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter)
 		}
 		header := http.Header{"Authorization": []string{authHeader}}
 		log.Debug("Using auth header ", header)
-		c, resp, err = websocket.DefaultDialer.Dial(address, header)
+		cam.wsConnection, resp, err = websocket.DefaultDialer.Dial(address, header)
 	}
 
 	if err != nil {
@@ -168,18 +170,18 @@ func (cam *AxisCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter)
 
 	messages := make(chan CameraEvent, 10)
 	go func() {
-		cam.wsMessageHandler(c, axisEventFilterList, messages)
+		cam.wsMessageHandler(axisEventFilterList, messages)
 	}()
 	return messages, nil
 }
 
-func (*AxisCameraDriver) wsMessageHandler(c *websocket.Conn, axisEventFilterList []AxisEventFilter, messages chan CameraEvent) {
+func (cam *AxisCameraDriver) wsMessageHandler(axisEventFilterList []AxisEventFilter, messages chan CameraEvent) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Info("Recovered from panic:", r)
 			log.Info("Disconnected from camera websocket.")
 		}
-		defer c.Close()
+		defer cam.wsConnection.Close()
 	}()
 	log.Info("Connected to camera websocket and subscribed to events.")
 	eventFilter := AxisEvent{
@@ -191,14 +193,15 @@ func (*AxisCameraDriver) wsMessageHandler(c *websocket.Conn, axisEventFilterList
 		},
 	}
 	log.Debugf("eventFilter: %+v\n", eventFilter)
-	c.WriteJSON(eventFilter)
+	cam.wsConnection.WriteJSON(eventFilter)
 	for {
-		_, message, err := c.ReadMessage()
+		_, message, err := cam.wsConnection.ReadMessage()
 		if err != nil {
 			log.Error("Error from WS stream:", err)
 			close(messages)
 			break
 		}
+
 		exisEvent := AxisEvent{}
 		err = json.Unmarshal(message, &exisEvent)
 		if err != nil {
@@ -224,6 +227,13 @@ func (*AxisCameraDriver) wsMessageHandler(c *websocket.Conn, axisEventFilterList
 		}
 	}
 	log.Info("Disconnected from camera websocket.")
+}
+
+func (cam *AxisCameraDriver) Close() {
+	log.Info("Stopping Axis camera driver")
+	if cam.wsConnection != nil {
+		cam.wsConnection.Close()
+	}
 }
 
 /*

@@ -36,4 +36,5 @@ type Driver interface {
 	Ping(address string) bool
 	Commit(transactionId string) error
 	SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error)
+	Close()
 }

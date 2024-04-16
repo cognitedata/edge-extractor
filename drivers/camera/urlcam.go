@@ -84,3 +84,6 @@ func (cam *UrlCameraDriver) Commit(transactionId string) error {
 func (cam *UrlCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error) {
 	return nil, nil
 }
+
+func (cam *UrlCameraDriver) Close() {
+}
