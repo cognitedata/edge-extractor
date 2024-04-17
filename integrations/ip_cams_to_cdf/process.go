@@ -40,7 +40,7 @@ func NewCameraImagesToCdf(cogClient *internal.CdfClient, extractorMonitoringID s
 func (intgr *CameraImagesToCdf) GetEventBus() *pubsub.PubSub[string, camera.CameraEvent] {
 	return intgr.eventbus
 }
-func (intgr *CameraImagesToCdf) SetConfig(localConfig IntegrationConfig) {
+func (intgr *CameraImagesToCdf) SetCameraConfig(localConfig IntegrationConfig) {
 	intgr.cameraConfigs = localConfig.Cameras
 }
 
@@ -77,15 +77,18 @@ func (intgr *CameraImagesToCdf) Start() error {
 		log.Info("Starting processing loop using remote configurations")
 		configQueue := intgr.BaseIntegration.ConfigObserver.SubscribeToIntegrationConfigUpdates(intgr.BaseIntegration.ID)
 		go func() {
+			isFirstRemoteConfig := true
 			for configAction := range configQueue {
 				// log.Debugf("Old config for ingration : %+v\n ", intgr.integrationConfig)
 				// log.Debugf("New config for ingration : %+v\n ", config)
 				log.Info("Config has been changed . Restarting processors")
-				intgr.BaseIntegration.ReportRunStatus("", core.ExtractionRunStatusSuccess, "Config has been changed . Restarting processors")
-				// Stopping all processors
-				intgr.StopAndClean()
+				if !isFirstRemoteConfig {
+					intgr.BaseIntegration.ReportRunStatus("", core.ExtractionRunStatusSuccess, "Config has been changed . Restarting processors")
+					intgr.StopAndClean()
+				}
 				intgr.LoadConfigFromJson(configAction.Config)
 				intgr.startAllProcessors()
+				isFirstRemoteConfig = false
 			}
 		}()
 	}
@@ -94,6 +97,7 @@ func (intgr *CameraImagesToCdf) Start() error {
 }
 
 func (intgr *CameraImagesToCdf) startAllProcessors() {
+	intgr.IsRunning = true
 	log.Info("Starting all camera processors")
 	for _, camera := range intgr.cameraConfigs {
 		if camera.State == "enabled" {
@@ -268,8 +272,9 @@ func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(ID uint64,
 				continue
 			}
 		}
-		log.Infof("Camera events stream processor %s exited main loop. ", name)
+		log.Infof("Camera events stream has been closed.Camera name : %s", name)
 		if !intgr.IsRunning {
+			log.Infof("Camera events processor %s has been stopped.Breaking stream retry loop.", name)
 			break
 		}
 	}

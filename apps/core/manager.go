@@ -44,7 +44,6 @@ func (am *AppManager) startConfigHandler() {
 			log.Info("Apps restarted")
 		}
 	}()
-
 }
 
 func (am *AppManager) LoadAppsFromRawConfig(configs json.RawMessage) error {
