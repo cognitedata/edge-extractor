@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -314,6 +315,9 @@ func (intgr *CameraImagesToCdf) executeProcessorRun(camera CameraConfig, cam *in
 	}()
 
 	img, err := cam.ExtractImage()
+	if metadata != nil {
+		metadata["capturedAt"] = strconv.FormatInt(time.Now().UnixMilli(), 10)
+	}
 	if err != nil {
 		log.Errorf("Can't extract image from camera  %s  . Error : %s", camera.Name, err.Error())
 		intgr.failureCounter++

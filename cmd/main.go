@@ -377,7 +377,7 @@ func main() {
 			internal.RemoveLinuxServiceEnv()
 		}
 	case "update":
-		log.Info("Updating edge-extractor service binary")
+		log.Info("Updating edge-extractor service binary to new version ", Version)
 		internal.UpdateLinuxServiceBinary()
 	case "event-bus":
 		log.Info("Starting event bus")
