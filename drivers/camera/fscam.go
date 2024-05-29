@@ -109,3 +109,7 @@ func (cam *FileSystemCameraDriver) SubscribeToEventsStream(eventFilters []EventF
 
 func (cam *FileSystemCameraDriver) Close() {
 }
+
+func (cam *FileSystemCameraDriver) GetServicesDiscoveryManifest(componentName string) ([]CameraServiceDiscoveryManifest, error) {
+	return nil, nil
+}

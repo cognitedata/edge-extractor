@@ -78,3 +78,7 @@ func (cam *ReolinkCameraDriver) SubscribeToEventsStream(eventFilters []EventFilt
 
 func (cam *ReolinkCameraDriver) Close() {
 }
+
+func (cam *ReolinkCameraDriver) GetServicesDiscoveryManifest(componentName string) ([]CameraServiceDiscoveryManifest, error) {
+	return nil, nil
+}

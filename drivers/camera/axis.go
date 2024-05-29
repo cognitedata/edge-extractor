@@ -76,7 +76,6 @@ func (cam *AxisCameraDriver) Configure(address, username, password string) error
 }
 
 func (cam *AxisCameraDriver) ExtractImage() (*Image, error) {
-	//"http://10.22.15.62/axis-cgi/jpg/image.cgi"
 	address := cam.address + "/axis-cgi/jpg/image.cgi"
 	if cam.digestTransport == nil {
 		t := dac.NewTransport(cam.username, cam.password)
@@ -129,8 +128,54 @@ func (cam *AxisCameraDriver) Commit(transactionId string) error {
 	return nil
 }
 
-// Connect to Axis WebSocket API and subscribe to events from the camera , for example motion detection
+func (cam *AxisCameraDriver) GetServicesDiscoveryManifest(component string) ([]CameraServiceDiscoveryManifest, error) {
+	address := cam.address + "/vapix/services"
+	if cam.digestTransport == nil {
+		t := dac.NewTransport(cam.username, cam.password)
+		cam.digestTransport = &t
+		cam.digestTransport.HTTPClient = &cam.httpClient
+	}
 
+	requestBody := `<?xml version="1.0" encoding="UTF-8"?>
+	<Envelope xmlns="http://www.w3.org/2003/05/soap-envelope">
+	 <Header/>
+	 <Body >
+	  <GetEventInstances xmlns="http://www.axis.com/vapix/ws/event1"/>
+	 </Body>
+	</Envelope>`
+
+	requestBodyIoReader := strings.NewReader(requestBody)
+
+	req, err := http.NewRequest("POST", address, requestBodyIoReader)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := cam.digestTransport.RoundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("camera api returned error code %s", resp.Status)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	eventsManifest := CameraServiceDiscoveryManifest{
+		Name:          "events.xml",
+		Format:        "soap",
+		ComponentName: "events",
+		Body:          body,
+	}
+	manifests := []CameraServiceDiscoveryManifest{eventsManifest}
+	return manifests, nil
+}
+
+// Connect to Axis WebSocket API and subscribe to events from the camera , for example motion detection
 func (cam *AxisCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) (stream chan CameraEvent, err error) {
 	// convert the address to a websocket address
 	digestAddress := cam.address + "/vapix/ws-data-stream?sources=events"
@@ -235,20 +280,3 @@ func (cam *AxisCameraDriver) Close() {
 		cam.wsConnection.Close()
 	}
 }
-
-/*
-Usefull topic :
-
-            {
-              "TopicFilter": "tnsaxis:CameraApplicationPlatform/FenceGuard/xinternal_data"
-},
-            {
-              "TopicFilter": "tns1:Device/tnsaxis:IO/Port"
-            }
-
-Fence events
-
- {\"apiVersion\":\"1.0\",\"method\":\"events:notify\",\"params\":{\"notification\":{\"topic\":\"tnsaxis:CameraApplicationPlatform/FenceGuard/Camera1Profile1\",\"timestamp\":1710752405172,\"message\":{\"source\":{},\"key\":{},\"data\":{\"active\":\"1\"}}}}}"
- {\"apiVersion\":\"1.0\",\"method\":\"events:notify\",\"params\":{\"notification\":{\"topic\":\"tnsaxis:CameraApplicationPlatform/FenceGuard/Camera1Profile1\",\"timestamp\":1710752408371,\"message\":{\"source\":{},\"key\":{},\"data\":{\"active\":\"0\"}}}}}
-
-*/

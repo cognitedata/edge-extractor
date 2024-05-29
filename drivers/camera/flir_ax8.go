@@ -110,3 +110,7 @@ func (cam *FlirAx8CameraDriver) SubscribeToEventsStream(eventFilters []EventFilt
 
 func (cam *FlirAx8CameraDriver) Close() {
 }
+
+func (cam *FlirAx8CameraDriver) GetServicesDiscoveryManifest(componentName string) ([]CameraServiceDiscoveryManifest, error) {
+	return nil, nil
+}

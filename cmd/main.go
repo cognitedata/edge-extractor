@@ -239,23 +239,22 @@ func startEdgeExtractor(mainConfigPath string) {
 
 		case "local_files_to_cdf":
 			log.Info(" local_files_to_cdf integration not implemented yet")
-			// intgr := local_files_to_cdf.NewLocalFilesToCdf(cdfCLient, config.ExtractorID, config.RemoteConfigSource)
-			// // intgr.SetLocalConfig(config.LocalIntegrationConfig["local_files_to_cdf"].(integrations.LocalFilesToCdfConfig))
-			// err = intgr.Start()
-			// if err != nil {
-			// 	log.Errorf(" %s integration can't be started . Error : %s", integrName, err.Error())
-			// } else {
-			// 	integrReg["local_files_to_cdf"] = intgr
-			// }
-
 		}
 	}
 
-	err = appManager.LoadAppsFromRawConfig(config.Apps)
-	if err != nil {
-		log.Error("Failed to load apps. Err:", err.Error())
-		return
+	if config.RemoteConfigSource == internal.ConfigSourceLocal {
+		log.Info("Starting apps using local configuration")
+		err = appManager.LoadAppsFromRawConfig(config.Apps)
+		if err != nil {
+			log.Error("Failed to load apps. Err:", err.Error())
+			return
+		}
+		appManager.StartApps()
+	} else {
+		log.Info("Starting apps remote configuration handler")
+		appManager.StartConfigHandler()
 	}
+
 }
 
 func stopExtractor() {

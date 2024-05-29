@@ -33,7 +33,7 @@ func (am *AppManager) SetIntegration(name string, integration interface{}) {
 	am.Integrations[name] = integration
 }
 
-func (am *AppManager) startConfigHandler() {
+func (am *AppManager) StartConfigHandler() {
 	log.Info("Starting processing loop using remote configurations")
 	configQueue := am.ConfigObserver.SubscribeToAppsConfigUpdates()
 	go func() {
@@ -41,6 +41,7 @@ func (am *AppManager) startConfigHandler() {
 			log.Infof("Received new application config.Restarting apps")
 			am.StopApps()
 			am.LoadAppsFromRawConfig(configAction.Config)
+			am.StartApps()
 			log.Info("Apps restarted")
 		}
 	}()
@@ -54,34 +55,36 @@ func (am *AppManager) LoadAppsFromRawConfig(configs json.RawMessage) error {
 	}
 
 	for _, appConfig := range appConfigs {
-		appInstane := lib.NewAppInstance(appConfig.AppName)
-		err := appInstane.ConfigureFromRaw(appConfig.Configurations)
+		appInstance := lib.NewAppInstance(appConfig.AppName)
+		err := appInstance.ConfigureFromRaw(appConfig.Configurations)
 		if err != nil {
 			log.Errorf("Failed to configure app %s: %v", appConfig.AppName, err)
 			continue
 		}
-		dependencies := appInstane.GetDependencies()
+		dependencies := appInstance.GetDependencies()
 		for _, integrationName := range dependencies.Integrations {
 			if integration, ok := am.Integrations[integrationName]; ok {
-				appInstane.ConfigureIntegration(integration)
+				appInstance.ConfigureIntegration(integration)
 			} else {
 				log.Errorf("Integration %s not configured for app %s", integrationName, appConfig.AppName)
 			}
 		}
-		err = appInstane.Start()
-		if err != nil {
-			log.Errorf("Failed to start app %s: %v", appConfig.AppName, err)
-			continue
-		}
-		am.Apps[appConfig.InstanceID] = appInstane
-		log.Infof("App %s started", appConfig.AppName)
+		am.Apps[appConfig.InstanceID] = appInstance
+		log.Infof("App %s loaded", appConfig.AppName)
 	}
 
 	return nil
 }
 
 func (am *AppManager) StartApps() {
-	go am.startConfigHandler()
+	log.Info("Starting micro-apps")
+	for _, app := range am.Apps {
+		err := app.Start()
+		if err != nil {
+			log.Errorf("Failed to start micro-app: %v", err)
+		}
+	}
+	log.Info("Micro-apps started")
 }
 
 func (am *AppManager) StopApps() {

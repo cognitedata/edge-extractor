@@ -87,3 +87,7 @@ func (cam *UrlCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) 
 
 func (cam *UrlCameraDriver) Close() {
 }
+
+func (cam *UrlCameraDriver) GetServicesDiscoveryManifest(componentName string) ([]CameraServiceDiscoveryManifest, error) {
+	return nil, nil
+}

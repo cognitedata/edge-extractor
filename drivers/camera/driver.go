@@ -27,6 +27,13 @@ type CameraManifest struct {
 	IsCameraEventStreamSupported bool
 }
 
+type CameraServiceDiscoveryManifest struct {
+	Name          string
+	Format        string // json, xml, soap
+	ComponentName string // Component name , for example "services" , "events", etc.
+	Body          []byte
+}
+
 type DriverConstructor func() Driver
 
 type Driver interface {
@@ -36,5 +43,6 @@ type Driver interface {
 	Ping(address string) bool
 	Commit(transactionId string) error
 	SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error)
+	GetServicesDiscoveryManifest(componentName string) ([]CameraServiceDiscoveryManifest, error)
 	Close()
 }
