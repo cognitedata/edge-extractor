@@ -128,7 +128,7 @@ func (cam *AxisCameraDriver) Commit(transactionId string) error {
 	return nil
 }
 
-func (cam *AxisCameraDriver) GetServicesDiscoveryManifest(component string) ([]CameraServiceDiscoveryManifest, error) {
+func (cam *AxisCameraDriver) GetCameraCapabilitiesManifest(component string) ([]CameraCapabilitiesManifest, error) {
 	address := cam.address + "/vapix/services"
 	if cam.digestTransport == nil {
 		t := dac.NewTransport(cam.username, cam.password)
@@ -165,13 +165,14 @@ func (cam *AxisCameraDriver) GetServicesDiscoveryManifest(component string) ([]C
 	if err != nil {
 		return nil, err
 	}
-	eventsManifest := CameraServiceDiscoveryManifest{
+	eventsManifest := CameraCapabilitiesManifest{
 		Name:          "events.xml",
 		Format:        "soap",
 		ComponentName: "events",
 		Body:          body,
+		IsRaw:         true,
 	}
-	manifests := []CameraServiceDiscoveryManifest{eventsManifest}
+	manifests := []CameraCapabilitiesManifest{eventsManifest}
 	return manifests, nil
 }
 

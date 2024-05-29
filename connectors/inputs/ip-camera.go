@@ -84,9 +84,9 @@ func (cam *IpCamera) Close() {
 	}
 }
 
-func (cam *IpCamera) GetServicesDiscoveryManifest(componentName string) ([]camera.CameraServiceDiscoveryManifest, error) {
+func (cam *IpCamera) GetCameraCapabilitiesManifest(componentName string) ([]camera.CameraCapabilitiesManifest, error) {
 	if cam.driver == nil {
 		return nil, fmt.Errorf("unknown driver")
 	}
-	return cam.driver.GetServicesDiscoveryManifest(componentName)
+	return cam.driver.GetCameraCapabilitiesManifest(componentName)
 }

@@ -178,7 +178,7 @@ func (intgr *CameraImagesToCdf) startSingleCameraProcessorLoop(cameraConfig Came
 		cameraEventFilters[i] = camera.EventFilter(filter)
 	}
 
-	err := intgr.SyncCameraServiceDiscoveryManistsWithCdf(cam)
+	err := intgr.DiscoverCameraCapabilities(cam)
 	if err != nil {
 		log.Error("Failed to sync cameras manifests with CDF. Err:", err.Error())
 	}
@@ -400,8 +400,8 @@ func (intgr *CameraImagesToCdf) StopAndClean() error {
 	return nil
 }
 
-func (intgr *CameraImagesToCdf) SyncCameraServiceDiscoveryManistsWithCdf(camera *inputs.IpCamera) error {
-	manifests, err := camera.GetServicesDiscoveryManifest("all")
+func (intgr *CameraImagesToCdf) DiscoverCameraCapabilities(camera *inputs.IpCamera) error {
+	manifests, err := camera.GetCameraCapabilitiesManifest("all")
 	if err != nil {
 		log.Errorf("Failed to get services discovery manifest . Error : %s", err.Error())
 		return err
@@ -412,8 +412,8 @@ func (intgr *CameraImagesToCdf) SyncCameraServiceDiscoveryManistsWithCdf(camera 
 	}
 
 	for _, manifest := range manifests {
-		externalId := fmt.Sprintf("camera_%d_discovery_manifest", camera.ID)
-		fileName := fmt.Sprintf("camera_%s_discovery_manifest_%s", camera.Name, manifest.Name)
+		externalId := fmt.Sprintf("camera_%d_capabilities_manifest", camera.ID)
+		fileName := fmt.Sprintf("camera_%s_capabilities_manifest_%s", camera.Name, manifest.Name)
 		err := intgr.BaseIntegration.CogClient.UploadInMemoryFile(manifest.Body, externalId, fileName, "", 0, nil)
 		if err != nil {
 			log.Infof("Failed to upload services discovery manifest to CDF. Error : %s", err.Error())

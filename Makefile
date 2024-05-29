@@ -1,8 +1,8 @@
-version="0.7.2"
+version="0.8.1"
 encryption_key=${CONFIG_ENCRYPTION_KEY}
 test_encryption_key=test_key_ZU8uJ8vxJs7Z75uF3Jy8m52 # gitleaks:allow
 
-run :
+run :-linux
 	go run cmd/main.go --config config_encrypted_local.json --key ${test_encryption_key}
 
 run-encrypt-config :

@@ -104,6 +104,6 @@ func (cam *HikvisionCameraDriver) SubscribeToEventsStream(eventFilters []EventFi
 func (cam *HikvisionCameraDriver) Close() {
 }
 
-func (cam *HikvisionCameraDriver) GetServicesDiscoveryManifest(componentName string) ([]CameraServiceDiscoveryManifest, error) {
+func (cam *HikvisionCameraDriver) GetCameraCapabilitiesManifest(component string) ([]CameraCapabilitiesManifest, error) {
 	return nil, nil
 }

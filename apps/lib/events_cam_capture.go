@@ -81,6 +81,11 @@ func (app *CameraEventBasedCaptureApp) ConfigureIntegration(integration interfac
 // If the app is not already running, it will start the image capture loop in a separate goroutine.
 // This function returns an error if there was a problem starting the app.
 func (app *CameraEventBasedCaptureApp) Start() error {
+	go app.startEventProcessingLoop()
+	return nil
+}
+
+func (app *CameraEventBasedCaptureApp) startEventProcessingLoop() error {
 	app.log.Info("Starting CameraEventBasedCaptureApp")
 	eventStream := app.integration.GetEventBus().Sub(app.config.TriggerTopics...)
 	app.log.Info("CameraEventBasedCaptureApp subscribed to event stream from topics: ", app.config.TriggerTopics)

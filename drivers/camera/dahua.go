@@ -95,6 +95,6 @@ func (cam *DahuaCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter
 func (cam *DahuaCameraDriver) Close() {
 }
 
-func (cam *DahuaCameraDriver) GetServicesDiscoveryManifest(componentName string) ([]CameraServiceDiscoveryManifest, error) {
+func (cam *DahuaCameraDriver) GetCameraCapabilitiesManifest(component string) ([]CameraCapabilitiesManifest, error) {
 	return nil, nil
 }
