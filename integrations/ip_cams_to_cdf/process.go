@@ -241,16 +241,17 @@ func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(ID uint64,
 		stream, err := camera.SubscribeToEventsStream(eventFilters)
 		if err != nil {
 			retryCount++
-			if retryCount > intgr.integrationConfig.RetryCount*10 {
-				log.Errorf("Failed to subscribe to camera events stream %s after %d retries", name, intgr.integrationConfig.RetryCount)
-				intgr.BaseIntegration.ReportRunStatus(name, core.ExtractionRunStatusFailure, fmt.Sprintf("extractor disconnected from event stream after %d retries. Camera name: %s ", intgr.integrationConfig.RetryCount, name))
-				return err
-			} else {
-				log.Infof("Lost connection to camera %s event stream. Reconnecting ...", name)
-				intgr.BaseIntegration.ReportRunStatus(name, core.ExtractionRunStatusFailure, fmt.Sprintf("Lost connection to camera %s event stream. Reconnecting ...", name))
-				time.Sleep(time.Second * time.Duration(intgr.integrationConfig.RetryInterval))
-				continue
+			log.Infof("Lost connection to camera %s event stream. Reconnecting ...", name)
+			intgr.BaseIntegration.ReportRunStatus(name, core.ExtractionRunStatusFailure, fmt.Sprintf("Lost connection to camera %s event stream. Reconnecting ...", name))
+			retryInterval := intgr.integrationConfig.RetryInterval * retryCount
+			if retryInterval > 600 {
+				retryInterval = 600 // max 10 minutes
 			}
+			time.Sleep(time.Second * time.Duration(retryInterval))
+			continue
+
+		} else {
+			retryCount = 0
 		}
 		intgr.BaseIntegration.ReportRunStatus(name, core.ExtractionRunStatusSuccess, fmt.Sprintf("Connected to camera event stream.Camera name : %s", name))
 		for event := range stream {
