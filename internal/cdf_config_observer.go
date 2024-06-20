@@ -22,30 +22,33 @@ const StopProcessorAction = 3
 const StartProcessorLoopAction = 4
 
 type CdfConfigObserver struct {
-	extractorID        string
-	isStarted          bool
-	cogClient          *CdfClient
-	remoteConfigSource string // assets, ext_pipeline_config
-	configRegistry     map[string]interface{}
-	configUpdatesQueue map[string]ConfigActionQueue
-	secretManager      *SecretManager
+	extractorID            string
+	isStarted              bool
+	cogClient              *CdfClient
+	remoteConfigSource     string // assets, ext_pipeline_config
+	configUpdatesQueue     map[string]ConfigActionQueue
+	appsConfigUpdatesQueue ConfigActionQueue
+	secretManager          *SecretManager
+	configRevision         int
 }
 
 type ConfigAction struct {
-	Name   int
-	Config interface{}
-	ProcId uint64
+	Name     int
+	Config   json.RawMessage
+	ProcId   uint64
+	Revision int
 }
 
 type ConfigActionQueue chan ConfigAction
 
 func NewCdfConfigObserver(extractorID string, cogClient *CdfClient, remoteConfigSource string, secretManager *SecretManager) *CdfConfigObserver {
 	return &CdfConfigObserver{extractorID: extractorID,
-		cogClient:          cogClient,
-		remoteConfigSource: remoteConfigSource,
-		configRegistry:     make(map[string]interface{}),
-		configUpdatesQueue: make(map[string]ConfigActionQueue),
-		secretManager:      secretManager,
+		cogClient:              cogClient,
+		remoteConfigSource:     remoteConfigSource,
+		configUpdatesQueue:     make(map[string]ConfigActionQueue),
+		appsConfigUpdatesQueue: make(ConfigActionQueue),
+		secretManager:          secretManager,
+		configRevision:         -1,
 	}
 }
 
@@ -53,7 +56,7 @@ func NewCdfConfigObserver(extractorID string, cogClient *CdfClient, remoteConfig
 func (intgr *CdfConfigObserver) Start(reloadInterval time.Duration) {
 	log.Info("Starting CDF config observer, remote config source = ", intgr.remoteConfigSource)
 	if reloadInterval == 0 {
-		reloadInterval = 60 * time.Second
+		reloadInterval = 15 * time.Second
 	}
 	intgr.isStarted = true
 	go func() {
@@ -72,15 +75,18 @@ func (intgr *CdfConfigObserver) Start(reloadInterval time.Duration) {
 
 }
 
-// SubscribeToConfigUpdates registers Integration in config observer and returns config action queue that Integration can use to receive config updates
+// SubscribeToIntegrationConfigUpdates registers Integration in config observer and returns config action queue that Integration can use to receive config updates
 // The queue has capacity of 5 items. If queue is full , the oldest item will be dropped. This is done to avoid blocking of config observer
 // Config events aren't filtered and it's responsibility of Integration to do change detection
 // name - name of Integration
 // config - pointer to Integration config struct
-func (intgr *CdfConfigObserver) SubscribeToConfigUpdates(name string, config interface{}) ConfigActionQueue {
-	intgr.configRegistry[name] = config
+func (intgr *CdfConfigObserver) SubscribeToIntegrationConfigUpdates(name string) ConfigActionQueue {
 	intgr.configUpdatesQueue[name] = make(ConfigActionQueue, 5)
 	return intgr.configUpdatesQueue[name]
+}
+
+func (intgr *CdfConfigObserver) SubscribeToAppsConfigUpdates() ConfigActionQueue {
+	return intgr.appsConfigUpdatesQueue
 }
 
 func (intgr *CdfConfigObserver) Stop() {
@@ -112,26 +118,35 @@ func (intgr *CdfConfigObserver) reloadRemoteConfigs() error {
 			return err
 		}
 
+		if intgr.configRevision == remoteConfig.Revision {
+			return nil
+		} else {
+			intgr.configRevision = remoteConfig.Revision
+			log.Infof("New config revision has been loaded. Revision : %d", remoteConfig.Revision)
+		}
+
 		err = intgr.secretManager.LoadEncryptedSecrets(remoteIntegrationsConfig.Secrets)
 		if err != nil {
 			log.Error("Failed to load secrets with error : ", err)
 		}
 
-		for integrationNameFromRemote, v := range remoteIntegrationsConfig.Integrations {
-			if _, ok := intgr.configRegistry[integrationNameFromRemote]; ok {
-				integrConfig := intgr.configRegistry[integrationNameFromRemote]
-				err = json.Unmarshal(v, integrConfig)
-				if err != nil {
-					log.Errorf("Failed to unmarshal remote config for processor %s with error : %s", integrationNameFromRemote, err)
-				}
-
+		for integrationNameFromRemote, rawConfig := range remoteIntegrationsConfig.Integrations {
+			if queue, ok := intgr.configUpdatesQueue[integrationNameFromRemote]; ok {
 				select {
-				case intgr.configUpdatesQueue[integrationNameFromRemote] <- ConfigAction{Name: NewConfigAction, Config: integrConfig}:
+				case queue <- ConfigAction{Name: NewConfigAction, Config: rawConfig, Revision: remoteConfig.Revision}:
 				default:
 					log.Warnf("Config action queue for processor %s is full", integrationNameFromRemote)
 				}
 			} else {
 				log.Errorf("Processor %s is not registered in config registry", integrationNameFromRemote)
+			}
+		}
+
+		if remoteIntegrationsConfig.Apps != nil {
+			select {
+			case intgr.appsConfigUpdatesQueue <- ConfigAction{Name: NewConfigAction, Config: remoteIntegrationsConfig.Apps, Revision: remoteConfig.Revision}:
+			default:
+				log.Warnf("Config action queue for app is full")
 			}
 		}
 

@@ -1,6 +1,7 @@
 package camera
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -12,14 +13,28 @@ type FileSystemCameraDriver struct {
 	fileCursor int
 	dirContent []fs.DirEntry
 	cursorMux  sync.Mutex
+	address    string
+	username   string
+	password   string
 }
 
 func NewFileSystemCameraDriver() Driver {
 	return &FileSystemCameraDriver{cursorMux: sync.Mutex{}}
 }
 
+func (cam *FileSystemCameraDriver) Configure(address, username, password string) error {
+	cam.address = address
+	cam.username = username
+	cam.password = password
+	return nil
+}
+
+func (cam *FileSystemCameraDriver) ExtractImage() (*Image, error) {
+	return cam.extractImageFromFiles(cam.address, cam.username, cam.password)
+}
+
 // ExtractImage reads the file from the file system and returns the image. If address is a directory, it will read the files in the directory using a cursor.
-func (cam *FileSystemCameraDriver) ExtractImage(address, username, password string) (*Image, error) {
+func (cam *FileSystemCameraDriver) extractImageFromFiles(address, username, password string) (*Image, error) {
 
 	if cam.dirContent != nil {
 		// saved cursor is not nil, so we have already read the directory
@@ -55,7 +70,7 @@ func (cam *FileSystemCameraDriver) ExtractImage(address, username, password stri
 				cam.fileCursor = 0
 				return nil, nil
 			}
-			return cam.ExtractImage(address, username, password)
+			return cam.extractImageFromFiles(address, username, password)
 		} else {
 			return cam.processFile(address)
 		}
@@ -74,7 +89,7 @@ func (cam *FileSystemCameraDriver) processFile(filePath string) (*Image, error) 
 	return &img, nil
 }
 
-func (cam *FileSystemCameraDriver) ExtractMetadata(address, username, password string) ([]byte, error) {
+func (cam *FileSystemCameraDriver) ExtractMetadata() ([]byte, error) {
 	return nil, nil
 }
 
@@ -86,4 +101,15 @@ func (cam *FileSystemCameraDriver) Ping(address string) bool {
 func (cam *FileSystemCameraDriver) Commit(transactionId string) error {
 	os.Remove(transactionId)
 	return nil
+}
+
+func (cam *FileSystemCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter) (chan CameraEvent, error) {
+	return nil, fmt.Errorf("file system camera driver does not support event streaming")
+}
+
+func (cam *FileSystemCameraDriver) Close() {
+}
+
+func (cam *FileSystemCameraDriver) GetCameraCapabilitiesManifest(component string) ([]CameraCapabilitiesManifest, error) {
+	return nil, nil
 }

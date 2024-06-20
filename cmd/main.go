@@ -11,8 +11,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cognitedata/edge-extractor/apps/core"
 	"github.com/cognitedata/edge-extractor/integrations/ip_cams_to_cdf"
 	"github.com/cognitedata/edge-extractor/internal"
+	"github.com/cskr/pubsub/v2"
 	"github.com/kardianos/service"
 	log "github.com/sirupsen/logrus"
 )
@@ -29,6 +31,7 @@ type Integration interface {
 }
 
 var integrReg map[string]Integration
+var appManager *core.AppManager
 
 type program struct{}
 
@@ -198,7 +201,7 @@ func startEdgeExtractor(mainConfigPath string) {
 
 	configureLogger(config.LogDir, config.LogLevel)
 
-	log.Info("Starting edge-extractor service.")
+	log.Info("Starting edge-extractor service. Version : ", Version)
 	secretManager := internal.NewSecretManager(EncryptionKey)
 	secretManager.LoadEncryptedSecrets(config.Secrets)
 	clientSecret := secretManager.GetSecret(config.Secret)
@@ -212,12 +215,16 @@ func startEdgeExtractor(mainConfigPath string) {
 		configObserver.Start(config.ConfigReloadInterval * time.Second)
 	}
 
+	systemEventBus := pubsub.New[string, internal.SystemEvent](20)
+
+	appManager = core.NewAppManager(configObserver)
+
 	integrReg = make(map[string]Integration)
 
 	for _, integrName := range config.EnabledIntegrations {
 		switch integrName {
 		case "ip_cams_to_cdf":
-			intgr := ip_cams_to_cdf.NewCameraImagesToCdf(cdfCLient, config.ExtractorID, configObserver)
+			intgr := ip_cams_to_cdf.NewCameraImagesToCdf(cdfCLient, config.ExtractorID, configObserver, systemEventBus)
 			intgr.SetSecretManager(secretManager)
 			if config.RemoteConfigSource == internal.ConfigSourceLocal {
 				intgr.LoadConfigFromJson(config.Integrations["ip_cams_to_cdf"])
@@ -227,20 +234,27 @@ func startEdgeExtractor(mainConfigPath string) {
 				log.Errorf(" %s integration can't be started . Error : %s", integrName, err.Error())
 			} else {
 				integrReg["ip_cams_to_cdf"] = intgr
+				appManager.SetIntegration("ip_cams_to_cdf", intgr)
 			}
+
 		case "local_files_to_cdf":
 			log.Info(" local_files_to_cdf integration not implemented yet")
-			// intgr := local_files_to_cdf.NewLocalFilesToCdf(cdfCLient, config.ExtractorID, config.RemoteConfigSource)
-			// // intgr.SetLocalConfig(config.LocalIntegrationConfig["local_files_to_cdf"].(integrations.LocalFilesToCdfConfig))
-			// err = intgr.Start()
-			// if err != nil {
-			// 	log.Errorf(" %s integration can't be started . Error : %s", integrName, err.Error())
-			// } else {
-			// 	integrReg["local_files_to_cdf"] = intgr
-			// }
-
 		}
 	}
+
+	if config.RemoteConfigSource == internal.ConfigSourceLocal {
+		log.Info("Starting apps using local configuration")
+		err = appManager.LoadAppsFromRawConfig(config.Apps)
+		if err != nil {
+			log.Error("Failed to load apps. Err:", err.Error())
+			return
+		}
+		appManager.StartApps()
+	} else {
+		log.Info("Starting apps remote configuration handler")
+		appManager.StartConfigHandler()
+	}
+
 }
 
 func stopExtractor() {
@@ -362,8 +376,22 @@ func main() {
 			internal.RemoveLinuxServiceEnv()
 		}
 	case "update":
-		log.Info("Updating edge-extractor service binary")
+		log.Info("Updating edge-extractor service binary to new version ", Version)
 		internal.UpdateLinuxServiceBinary()
+	case "event-bus":
+		log.Info("Starting event bus")
+		eventBus := pubsub.New[string, string](20)
+		topic := []string{"1/tnsaxis:CameraApplicationPlatform/FenceGuard/Camera1Profile1"}
+		stream := eventBus.Sub(topic...)
+		go func() {
+			for msg := range stream {
+				log.Info("Received message : ", msg)
+				break
+			}
+		}()
+		log.Info("Publishing message")
+		eventBus.TryPub("test", "1/tnsaxis:CameraApplicationPlatform/FenceGuard/Camera1Profile1")
+		select {}
 
 	case "run":
 		// Should be used to start service from CLI\
