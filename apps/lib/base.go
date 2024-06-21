@@ -31,6 +31,7 @@ type AppInstanceConstructor func() AppInstance
 func NewAppInstance(name string) AppInstance {
 	appInstance := map[string]AppInstanceConstructor{
 		"CameraEventBasedCaptureApp": NewCameraEventBasedCaptureApp,
+		"GenaiImageProcessingApp":    NewGenaiImageProcessingApp,
 	}
 
 	if constructor, ok := appInstance[name]; ok {

@@ -12,7 +12,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// App listens for camera events (motion detection) and call image capture on one or multiple cameras
 type CameraEventBasedCaptureAppConfig struct {
 	TriggerTopics []string
 	// List of camera IDs to capture images from
@@ -22,6 +21,7 @@ type CameraEventBasedCaptureAppConfig struct {
 	MaxParallelWorkers  int      // Maximum number of parallel workers
 }
 
+// CameraEventBasedCaptureApp listens for camera events (motion detection) and call image capture on one or multiple cameras
 type CameraEventBasedCaptureApp struct {
 	integration                   *ip_cams_to_cdf.CameraImagesToCdf
 	config                        CameraEventBasedCaptureAppConfig

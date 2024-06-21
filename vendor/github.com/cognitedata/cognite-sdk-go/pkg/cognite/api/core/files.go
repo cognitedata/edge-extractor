@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/json"
-
 	"github.com/cognitedata/cognite-sdk-go/pkg/cognite/api"
 	dto "github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core"
 	"github.com/pkg/errors"
@@ -63,7 +62,7 @@ func (files *Files) Create(fileMetadata dto.CreateFileMetadata) (dto.FileMetadat
 	if err != nil {
 		return dto.FileMetadataWithUploadUrl{}, errors.Wrap(err, "Unable to marshal struct in files.Create()")
 	}
-	body, err := files.apiClient.Post("files?overwrite=true", jsonBytes)
+	body, err := files.apiClient.Post("files", jsonBytes)
 	if err != nil {
 		return dto.FileMetadataWithUploadUrl{}, err
 	}

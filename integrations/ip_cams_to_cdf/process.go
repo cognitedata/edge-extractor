@@ -45,6 +45,10 @@ func (intgr *CameraImagesToCdf) SetCameraConfig(localConfig IntegrationConfig) {
 	intgr.cameraConfigs = localConfig.Cameras
 }
 
+func (intgr *CameraImagesToCdf) GetCameraByID(ID uint64) *inputs.IpCamera {
+	return intgr.cameras[ID]
+}
+
 func (intgr *CameraImagesToCdf) LoadConfigFromJson(config json.RawMessage) error {
 	var localConfig IntegrationConfig
 	err := json.Unmarshal(config, &localConfig)
@@ -334,33 +338,38 @@ func (intgr *CameraImagesToCdf) executeProcessorRun(camera CameraConfig, cam *in
 			time.Sleep(time.Second * 1)
 			return nil
 		}
+		err = intgr.PublishImageToCDF(camera, img, metadata)
+	}
+	return err
+}
 
-		timeStamp := time.Now().Format("2006-01-02T15:04:05.999")
-		externalId := fmt.Sprintf("%s_%d", camera.Name, time.Now().UnixNano())
-		fileName := camera.Name + " " + timeStamp + ".jpeg"
-		retryCount := 0
-		for {
-			err := intgr.BaseIntegration.CogClient.UploadInMemoryFile(img.Body, externalId, fileName, img.Format, camera.LinkedAssetID, metadata)
-			if err != nil {
-				if strings.Contains(err.Error(), "Duplicate external ids") {
-					log.Info("Duplicate external ids error. Errror ignored. Error : ", err.Error())
-					intgr.successCounter++
-					break
-				} else {
-					log.Error("Failed to upload image to CDF. Error : ", err.Error())
-				}
-				intgr.failureCounter++
-				intgr.BaseIntegration.ReportRunStatus(camera.Name, core.ExtractionRunStatusFailure, fmt.Sprintf("failed to upload img, err :%s", err.Error()))
-				retryCount++
-				if !intgr.IsRunning || retryCount > intgr.integrationConfig.RetryCount {
-					break
-				}
-				time.Sleep(time.Second * time.Duration(intgr.integrationConfig.RetryInterval*retryCount))
-			} else {
-				log.Debug("File uploaded to CDF successfully")
+func (intgr *CameraImagesToCdf) PublishImageToCDF(camera CameraConfig, img *camera.Image, metadata map[string]string) error {
+	timeStamp := time.Now().Format("2006-01-02T15:04:05.999")
+	externalId := fmt.Sprintf("%s_%d", camera.Name, time.Now().UnixNano())
+	fileName := camera.Name + " " + timeStamp + ".jpeg"
+	retryCount := 0
+	var err error
+	for {
+		err = intgr.BaseIntegration.CogClient.UploadInMemoryFile(img.Body, externalId, fileName, img.Format, camera.LinkedAssetID, metadata)
+		if err != nil {
+			if strings.Contains(err.Error(), "Duplicate external ids") {
+				log.Info("Duplicate external ids error. Error ignored. Error : ", err.Error())
 				intgr.successCounter++
 				break
+			} else {
+				log.Error("Failed to upload image to CDF. Error : ", err.Error())
 			}
+			intgr.failureCounter++
+			intgr.BaseIntegration.ReportRunStatus(camera.Name, core.ExtractionRunStatusFailure, fmt.Sprintf("failed to upload img, err :%s", err.Error()))
+			retryCount++
+			if !intgr.IsRunning || retryCount > intgr.integrationConfig.RetryCount {
+				break
+			}
+			time.Sleep(time.Second * time.Duration(intgr.integrationConfig.RetryInterval*retryCount))
+		} else {
+			log.Debug("File uploaded to CDF successfully")
+			intgr.successCounter++
+			break
 		}
 	}
 	return err
