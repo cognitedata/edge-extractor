@@ -31,7 +31,7 @@ func TestImageToTextNoText(t *testing.T) {
 	}
 
 	prompt := `The picture contains horizontal metal pipe with printed text on each pipe.
-	 Extract text from each pipe and total number of pipes on picture. Set stop_keyword to true if the keyword is found in the text otherwise .
+	 Extract text from each pipe and total number of pipes on picture. 
 	 Ignore text:Not enough power, product requires POE class 4 or higher. 
 	 Stop keyword: "HEAT NO"
 	 Response in JSON format:

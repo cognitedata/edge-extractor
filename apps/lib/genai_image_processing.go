@@ -197,13 +197,15 @@ func (app *GenaiImageProcessingApp) runWorker(id uint64, imageSyncID int64) {
 		return
 	}
 
-	metadata["llmResponseText"] = llmResponseText
+	metadata["llmResponse"] = llmResponseText
+	log.Debugf("LLM response: %s", llmResponseText)
 
 	err = app.integration.PublishImageToCDF(*cameraConfig, image, metadata)
 	if err != nil {
 		app.log.Errorf("Failed to publish image to CDF: %v", err)
 		return
 	}
+	log.Debug("Image processed and published to CDF successfully : %s")
 
 }
 

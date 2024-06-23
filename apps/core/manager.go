@@ -40,9 +40,14 @@ func (am *AppManager) StartConfigHandler() {
 		for configAction := range configQueue {
 			log.Infof("Received new application config.Restarting apps")
 			am.StopApps()
-			am.LoadAppsFromRawConfig(configAction.Config)
-			am.StartApps()
-			log.Info("Apps restarted")
+			err := am.LoadAppsFromRawConfig(configAction.Config)
+			if err != nil {
+				log.Errorf("Failed to load apps from config: %v", err)
+				continue
+			} else {
+				am.StartApps()
+				log.Info("Apps restarted")
+			}
 		}
 	}()
 }
