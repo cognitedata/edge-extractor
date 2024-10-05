@@ -277,6 +277,11 @@ func (intgr *CameraImagesToCdf) StartSingleCameraEventsProcessingLoop(ID uint64,
 					Source:      "edge-extractor:camera",
 				},
 			}
+			// TODO: Temporary disable event republishing to CDF
+			disableEventRepublish := true
+			if disableEventRepublish {
+				continue
+			}
 			_, err := intgr.CogClient.Client().Events.Create(cdfEvents)
 			if err != nil {
 				log.Errorf("Failed to publish event to CDF. Error : %s", err.Error())

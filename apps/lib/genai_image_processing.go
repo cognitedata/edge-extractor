@@ -190,21 +190,33 @@ func (app *GenaiImageProcessingApp) runWorker(id uint64, imageSyncID int64) {
 		return
 	}
 
-	llmResponseText, err := app.llmProvider.ImageToText(image.Body, app.config.Prompt)
+	llmResponse, err := app.llmProvider.ImageToText(image.Body, app.config.Prompt)
 
 	if err != nil {
 		app.log.Errorf("Failed to convert image to text: %v", err)
-		return
+		metadata["llmAppSpecificResponse"] = ""
+	} else {
+		metadata["llmAppSpecificResponse"] = string(llmResponse.AppSpecificResponse)
+		systemResponseText, err := json.Marshal(llmResponse.System)
+		if err != nil {
+			app.log.Errorf("Failed to marshal system response: %v", err)
+		} else {
+			metadata["llmSystemResponse"] = string(systemResponseText)
+		}
 	}
 
-	metadata["llmResponse"] = llmResponseText
-	log.Debugf("LLM response: %s", llmResponseText)
+	log.Info("-------------Pipe detection results-------------")
+	log.Infof("Event ID : %s", metadata["eventCorrelationId"])
+	log.Infof("Camera ID : %s", metadata["cameraId"])
+	log.Infof("Image Sync ID : %s", metadata["imageSyncId"])
+	log.Info(metadata["llmAppSpecificResponse"])
+	log.Info(metadata["llmSystemResponse"])
 
-	err = app.integration.PublishImageToCDF(*cameraConfig, image, metadata)
-	if err != nil {
-		app.log.Errorf("Failed to publish image to CDF: %v", err)
-		return
-	}
+	//err = app.integration.PublishImageToCDF(*cameraConfig, image, metadata)
+	//if err != nil {
+	//	app.log.Errorf("Failed to publish image to CDF: %v", err)
+	//	return
+	//}
 	log.Debug("Image processed and published to CDF successfully : %s")
 
 }

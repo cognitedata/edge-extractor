@@ -128,7 +128,7 @@ func (co *CdfClient) UploadMultipartFileBody(filePath, fileName, mimeType, uploa
 		return err
 	}
 
-	log.Debug("Response :", string(body))
+	log.Debug("AppSpecificResponse :", string(body))
 	if resp.Body != nil {
 		resp.Body.Close()
 	}
@@ -172,7 +172,7 @@ func (co *CdfClient) BasicUploadFileBody(filePath, fileName, mimeType, uploadUrl
 		return err
 	}
 
-	log.Debug("Response :", string(body))
+	log.Debug("AppSpecificResponse :", string(body))
 	if resp.Body != nil {
 		resp.Body.Close()
 	}
@@ -205,7 +205,7 @@ func (co *CdfClient) UploadInMemoryBody(body []byte, fileName, mimeType, uploadU
 		return err
 	}
 
-	log.Debug("Response :", string(respBody))
+	log.Debug("AppSpecificResponse :", string(respBody))
 	if resp.Body != nil {
 		resp.Body.Close()
 	}

@@ -201,10 +201,10 @@ func (cam *AxisCameraDriver) SubscribeToEventsStream(eventFilters []EventFilter)
 	if err != nil {
 		log.Error("Error connecting to camera websocket:", err)
 		if resp != nil {
-			log.Info("Response from camera websocket:", resp.Status)
-			log.Info("Response headers from camera websocket:", resp.Header)
+			log.Info("AppSpecificResponse from camera websocket:", resp.Status)
+			log.Info("AppSpecificResponse headers from camera websocket:", resp.Header)
 			bodyBytes, _ := io.ReadAll(resp.Body)
-			log.Info("Response body from camera websocket:", string(bodyBytes))
+			log.Info("AppSpecificResponse body from camera websocket:", string(bodyBytes))
 		}
 		return nil, err
 	}
