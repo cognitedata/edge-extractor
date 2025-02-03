@@ -131,12 +131,31 @@ func RemoveLinuxServiceEnv() error {
 }
 
 func UpdateLinuxServiceBinary() error {
-	fmt.Println("1. updating edge-extractor binary")
+	fmt.Println("WARNING: This operation will update edge-extractor binary.It might require root privileges or executed using sudo command.")
+	// stop edge-extractor service
+	fmt.Println("1. stopping edge-extractor service")
+	cmd := exec.Command("systemctl", "stop", "edge-extractor")
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println("1. error stopping edge-extractor service . Stop service manually. Error: " + err.Error())
+	}
+	fmt.Println("2. updating edge-extractor binary")
 	fullBinaryPath, err := os.Executable()
-	fmt.Println("2. copying " + fullBinaryPath + " to /usr/local/bin/edge-extractor")
 	if err != nil {
 		return err
 	}
-	fmt.Println("1. edge-extractor binary updated")
+	fmt.Println("3. copying " + fullBinaryPath + " to /usr/local/bin/edge-extractor")
+	cmd = exec.Command("cp", "-f", fullBinaryPath, "/usr/local/bin/edge-extractor")
+	err = cmd.Run()
+	if err != nil {
+		return err
+	}
+	fmt.Println("4. edge-extractor binary updated")
+	fmt.Println("5. starting edge-extractor service")
+	cmd = exec.Command("systemctl", "start", "edge-extractor")
+	err = cmd.Run()
+	if err != nil {
+		fmt.Println("1. error starting edge-extractor service . Start service manually. Error: " + err.Error())
+	}
 	return nil
 }

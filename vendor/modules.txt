@@ -7,9 +7,15 @@ github.com/cognitedata/cognite-sdk-go/pkg/cognite/api/iam
 github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto
 github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/core
 github.com/cognitedata/cognite-sdk-go/pkg/cognite/dto/iam
+# github.com/cskr/pubsub/v2 v2.0.1
+## explicit; go 1.18
+github.com/cskr/pubsub/v2
 # github.com/golang/protobuf v1.4.3
 ## explicit; go 1.9
 github.com/golang/protobuf/proto
+# github.com/gorilla/websocket v1.5.1
+## explicit; go 1.20
+github.com/gorilla/websocket
 # github.com/kardianos/service v1.2.0
 ## explicit; go 1.12
 github.com/kardianos/service
@@ -35,6 +41,8 @@ github.com/xinsnake/go-http-digest-auth-client
 ## explicit; go 1.17
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
+golang.org/x/net/internal/socks
+golang.org/x/net/proxy
 # golang.org/x/oauth2 v0.0.0-20210113205817-d3ed898aa8a3
 ## explicit; go 1.11
 golang.org/x/oauth2

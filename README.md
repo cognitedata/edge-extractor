@@ -83,7 +83,7 @@ Parameter | ENV_VAR | Description | Example
 The process connects to each IP camera , fetches images using camera specific API and uploads images to CDF Files and optionally links them to camera asset.
 The processes supports parallel data retrieval from multiple devices. 
 
-Configurations : 
+`Cameras` configurations : 
 
 Parameter | Description | Example
 --- | --- | ---
@@ -97,6 +97,9 @@ Parameter | Description | Example
 `State` | State of the camera (enabled/disabled) | `enabled`
 `LinkedAssetID` | ID of Asset that repsents camera (OPTIONAL) . All images are linked to that Asset if configured | 403447394704254
 
+
+`DisableRunReporting` :   
+   Disables Extraction Pipeline  Run reporting to CDF , default value `false`
 
 
 ### Service CLI parameters

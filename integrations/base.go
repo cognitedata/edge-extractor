@@ -12,12 +12,13 @@ import (
 // BaseIntegration is a base class for all integrations. Integrations are long running processes that internally run one or more processors (goroutines)
 // All processors share that same logic but configured differently. StateTracker is used to track the state of all processors and to control them.
 type BaseIntegration struct {
-	ID             string
-	CogClient      *internal.CdfClient
-	IsRunning      bool
-	StateTracker   *internal.StateTracker
-	extractorID    string
-	ConfigObserver *internal.CdfConfigObserver // remote config observer
+	ID                  string
+	CogClient           *internal.CdfClient
+	IsRunning           bool
+	StateTracker        *internal.StateTracker
+	extractorID         string
+	ConfigObserver      *internal.CdfConfigObserver // remote config observer
+	disableRunReporting bool
 }
 
 func NewIntegration(id string, cogClient *internal.CdfClient, extractorID string, configObserver *internal.CdfConfigObserver) *BaseIntegration {
@@ -31,6 +32,10 @@ func NewIntegration(id string, cogClient *internal.CdfClient, extractorID string
 
 func (intgr *BaseIntegration) Stop() {
 	intgr.IsRunning = false
+}
+
+func (intgr *BaseIntegration) DisableRunReporting(state bool) {
+	intgr.disableRunReporting = state
 }
 
 func (intgr *BaseIntegration) StopProcessor(procId uint64) {
@@ -49,6 +54,9 @@ func (intgr *BaseIntegration) StopProcessor(procId uint64) {
 }
 
 func (intgr *BaseIntegration) ReportRunStatus(camExternalID, status, msg string) {
+	if intgr.disableRunReporting {
+		return
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			stack := string(debug.Stack())
@@ -56,5 +64,10 @@ func (intgr *BaseIntegration) ReportRunStatus(camExternalID, status, msg string)
 		}
 	}()
 	exRun := core.CreateExtractionRun{ExternalID: intgr.extractorID, Status: status, Message: msg}
-	intgr.CogClient.Client().ExtractionPipelines.CreateExtractionRuns(core.CreateExtractonRunsList{exRun})
+	client := intgr.CogClient.Client()
+	if client == nil {
+		log.Error("Cdf client is not initialized")
+		return
+	}
+	client.ExtractionPipelines.CreateExtractionRuns(core.CreateExtractonRunsList{exRun})
 }
