@@ -10,7 +10,7 @@ require (
 require github.com/cskr/pubsub/v2 v2.0.1 // indirect
 
 require (
-	github.com/golang/protobuf v1.4.3 // indirect
+	github.com/golang/protobuf v1.5.0 // indirect
 	github.com/gorilla/websocket v1.5.1
 	github.com/kardianos/service v1.2.0
 	github.com/kelseyhightower/envconfig v1.4.0 // indirect
@@ -22,7 +22,7 @@ require (
 	golang.org/x/oauth2 v0.0.0-20210113205817-d3ed898aa8a3 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/protobuf v1.25.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 )
 
 replace github.com/cognitedata/cognite-sdk-go => ../../cognite-sdk-go
