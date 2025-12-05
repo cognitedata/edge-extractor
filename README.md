@@ -1,5 +1,22 @@
 # Edge extractor 
 
+## IMP: Severely out of date. Do not use as is. Will require substantial effort to update.
+
+This project was using a Go cognite-sdk version that was probably modifed and presnet only on the developers local machine.
+
+The below lines in mod.go indicated as such and there is no release of the sdk matching that version.
+```
+github.com/cognitedata/cognite-sdk-go v0.3.2-0.20211022150037-c6aa1283f946
+
+replace github.com/cognitedata/cognite-sdk-go => ../../cognite-sdk-go
+```
+Using the published version of the cognite-sdk-go removed methods that were required for this project to work. Which were presumly added to the developer's local version of the sdk. 
+
+The cognite-sdk-go sdk was updated in 2021 and has a number of high and moderate severity security vulnerabilities.https://github.com/cognitedata/cognite-sdk-go/security/dependabot
+
+
+------------------------------------------------
+
 The edge extractor is a remote data extraction agent. The service should be installed on-premise (typically DMZ network) and talk to devices over the local network or via serial protocols.
 
 The service is distributed as a self-contained platform-specific binary.  
